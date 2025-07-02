@@ -1,5 +1,13 @@
 # prefab2png
 
+![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)
+![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)
+![Release](https://img.shields.io/badge/release-v0.3-green.svg)
+![Pillow](https://img.shields.io/badge/made%20with-Pillow-yellow.svg)
+![GitHub issues](https://img.shields.io/github/issues/dash16/prefab2png)
+
+# prefab2png
+
 This Python script renders layered map images from game files used by the game **7 Days to Die**. It creates layers of labeled points of interest (POIs) using in-game data, suitable for editing or display.
 
 **Version:** 0.3  

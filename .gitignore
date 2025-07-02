@@ -1,3 +1,9 @@
+# macOS files
+.DS_Store
+
+# Project output
+output/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

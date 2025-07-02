@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.1
+- Fixed logic grouping street signs together
+- Added biome logging to verbose output
+- Fixed bug that was assigning some POIs the wrong color code for difficulty tier
+
 ## v0.3
 - Initial public release.
 - Licensed under AGPL-3.0

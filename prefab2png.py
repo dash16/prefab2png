@@ -243,8 +243,11 @@ for category, points in categorized_points.items():
         dot_fill = TIER_COLORS.get(tier, dot_color) if tier is not None else dot_color
 
         if args.verbose:
-            tier_str = f" (Tier {tier})" if tier is not None else ""
-            verbose_log.write(f"{name},{display},{tier},{dot_fill}\n")
+            if verbose_log.tell() == 0:
+                verbose_log.write("prefab_name,display_name,tier,color,layer\n")  # Write header
+
+            log_tier = tier if tier is not None else "unknown"
+            verbose_log.write(f"{name},{display},{log_tier},{dot_fill},{category}\n")
 
         points_draw.ellipse((px - radius - 1, pz - radius - 1, px + radius + 1, pz + radius + 1), fill="white")
         points_draw.ellipse((px - radius, pz - radius, px + radius, pz + radius), fill=dot_fill)

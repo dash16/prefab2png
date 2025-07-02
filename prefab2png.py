@@ -207,8 +207,12 @@ for deco in root.findall('.//decoration'):
     x, y, z = map(float, pos_str.split(","))
     px, pz = transform_coords(x, z)
 
-    if args.with_player_starts and "player_start" in name:
-        category = "player_starts"
+    if "player_start" in name:
+        if args.with_player_starts:
+            category = "player_starts"
+        else:
+            excluded_names["excluded"].add(name)
+            continue
     elif (name.startswith("street_") and "street_light" not in name) or \
      name.startswith("sign_260") or name.startswith("sign_73"):
         category = "streets"

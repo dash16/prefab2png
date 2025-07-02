@@ -209,7 +209,8 @@ for deco in root.findall('.//decoration'):
 
     if args.with_player_starts and "player_start" in name:
         category = "player_starts"
-    elif name.startswith("street_") and "street_light" not in name:
+    elif (name.startswith("street_") and "street_light" not in name) or \
+     name.startswith("sign_260") or name.startswith("sign_73"):
         category = "streets"
     else:
         biome_name = "unknown"

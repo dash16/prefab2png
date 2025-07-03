@@ -259,11 +259,55 @@ for category, points in categorized_points.items():
         bbox = labels_draw.textbbox((0, 0), display, font=font)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
-        label_rect = (
-            px, pz + 4, px + text_width + 2 * LABEL_PADDING, pz + 4 + text_height + 2 * LABEL_PADDING
-        )
-        text_x = label_rect[0] + LABEL_PADDING
-        text_y = label_rect[1] + LABEL_PADDING
+
+        # Try placing the label offset in a square spiral
+        label_pos = None
+        for radius in range(0, LABEL_SEARCH_RADIUS, LABEL_STEP):
+            for dx in range(-radius, radius + 1, LABEL_STEP):
+                for dy in range(-radius, radius + 1, LABEL_STEP):
+                    lx = px + dx
+                    ly = pz + dy
+                    label_box = (
+                        lx, ly,
+                        lx + text_width + 2 * LABEL_PADDING,
+                        ly + text_height + 2 * LABEL_PADDING
+                    )
+                    # Check for overlap
+                    if all(not (
+                        label_box[0] < ox2 and label_box[2] > ox1 and
+                        label_box[1] < oy2 and label_box[3] > oy1
+                    ) for (ox1, oy1, ox2, oy2) in occupied):
+                        label_pos = label_box
+                        occupied.append(label_box)
+                        break
+                if label_pos:
+                    break
+            if label_pos:
+                break
+
+        # Fallback to default position if no space found
+        if not label_pos:
+            label_pos = (
+                px, pz + 4,
+                px + text_width + 2 * LABEL_PADDING,
+                pz + 4 + text_height + 2 * LABEL_PADDING
+            )
+            occupied.append(label_pos)
+
+        text_x = label_pos[0] + LABEL_PADDING
+        text_y = label_pos[1] + LABEL_PADDING
+
+        # Draw connector line from point to label center
+        label_center_x = text_x + text_width // 2
+        label_center_y = text_y + text_height // 2
+        labels_draw.line([(px, pz), (label_center_x, label_center_y)], fill="gray", width=1)
+
+        # Draw drop shadow
+        for ox in (-1, 0, 1):
+            for oy in (-1, 0, 1):
+                if ox != 0 or oy != 0:
+                    labels_draw.text((text_x + ox, text_y + oy), display, fill="white", font=font)
+        labels_draw.text((text_x, text_y), display, fill=text_color, font=font)
 
         for ox in (-1, 0, 1):
             for oy in (-1, 0, 1):

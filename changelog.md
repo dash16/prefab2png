@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.3
+- Restored label placement logic with overlap avoidance and connector lines
+- Labels now appear offset from prefab dots with a connecting gray line
+- Fixed issue where labels were overlapping or sitting directly on top of dots
+
 ## v0.3.2
 - Fixed bug where `player_start` POIs were incorrectly rendered in biome layers when `--with-player-starts` was not set
 

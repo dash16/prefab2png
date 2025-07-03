@@ -28,9 +28,10 @@ Prefab difficulty tiers (0–5) are color-coded based on an optional `diff.csv` 
 
 - 🗺️ Renders 6145x6145 PNG layers
 - 🎨 Color-coded prefab difficulty (via `diff.csv`)
-- 📍 Optional text labels for each prefab
+- 📍 Optional text labels for each prefab, with overlap avoidance and connector lines
 - 🔎 Verbose logging and display name fallback
 - 📁 Output directory includes points, labels, and optionally combined layers
+- 📝 Logs prefab name, display name, tier, color, and layer in `verbose_log.txt`
 
 ---
 

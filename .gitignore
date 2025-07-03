@@ -1,7 +1,8 @@
 # macOS files
 .DS_Store
 
-# Project output
+# Project files
+prefab2pngdev.py
 output/
 
 # Byte-compiled / optimized / DLL files

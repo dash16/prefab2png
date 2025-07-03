@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4
+- Full script modularization (Config, loader, parser, renderer)
+- All global state moved into structured components
+- Final output and logging logic isolated into helper functions
+- Trader POIs are no longer treated with special attention — no more green dots, mega-fonts, or inflated egos. They're just red dots like everyone else who hasn't been assigned a difficulty tier. All it cost was Trader Joel’s hat… it was delicious.
+- Ready for scalable development, testing, or CLI integration
+
 ## v0.3.3
 - Restored label placement logic with overlap avoidance and connector lines
 - Labels now appear offset from prefab dots with a connecting gray line

@@ -6,8 +6,6 @@
   Every prefab now receives a unique ID (e.g. `P0123`) which is rendered directly on the map when `--numbered-dots` is used. IDs also appear in verbose logging to aid reference and analysis.
 - 🧾 **Map-Based POI Legend**  
   A legend panel is dynamically rendered on the map's unused margins (left + right) showing every `POI_ID → Display Name` mapping. Automatically activated with `--numbered-dots`.
-- 🟦 **Optional Bounding Boxes**  
-  Add `--bounding-boxes` to draw the prefab bounds based on size attributes. Helpful for debugging and visualizing structure footprint.
 - 🔎 **Better Label Placement (v3-style fallback)**  
   Label collision detection now spirals outward to find open space before falling back to the default position. Cleaner labeling in dense prefab clusters.
 

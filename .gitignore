@@ -5,6 +5,10 @@
 prefab2pngdev.py
 output/
 
+# Regression testing tools (local-only)
+regression_test.py
+golden_outputs/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -49,7 +49,6 @@ python3 prefab2png.py \
   --with-player-starts \
   --log-missing \
   --verbose \
-  --bounding-boxes
 ```
 ## 🖥️ Requirements
 

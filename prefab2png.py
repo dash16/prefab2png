@@ -36,6 +36,20 @@ parser.add_argument("--bounding-boxes", action="store_true", help="Render prefab
 parser.add_argument("--numbered-dots", action="store_true", help="Replace prefab dots with unique POI IDs.")
 args = parser.parse_args()
 
+# === POI Mask for safe label placement ===
+from PIL import ImageColor
+LABEL_MASK_PATH = "prefab_label_mask_optimized.gif"
+LABEL_MASK_RED = ImageColor.getrgb("#A51B1B")  # (165, 27, 27)
+LABEL_MASK_GREEN = ImageColor.getrgb("#007600")
+LABEL_MASK_SEARCH_RADIUS = 10  # adjustable
+
+label_mask = None
+if os.path.exists(LABEL_MASK_PATH):
+    label_mask = Image.open(LABEL_MASK_PATH).convert("RGB")
+    print(f"✅ Loaded label mask: {LABEL_MASK_PATH}")
+else:
+    print(f"⚠️ Label mask not found: {LABEL_MASK_PATH} — label filtering disabled.")
+
 # === CONFIGURATION ===
 class Config:
     def __init__(self, args):
@@ -69,7 +83,7 @@ class Config:
 
         if self.args.verbose:
             self.verbose_log_file = open(self.verbose_log, "w", encoding="utf-8")
-            self.verbose_log_file.write("poi_id,prefab_name,display_name,tier,dot_color\n")
+            self.verbose_log_file.write("poi_id,prefab_name,display_name,dot_color,placement\n")
         else:
             self.verbose_log_file = None
 
@@ -154,9 +168,7 @@ TIER_COLORS, prefab_tiers = load_tiers()
 IMAGE_SIZE = (6145, 6145)
 MAP_CENTER = 3072
 DOT_RADIUS = 4
-DOT_RADIUS_HIGHLIGHT = 6
 FONT_SIZE = 12
-FONT_SIZE_HIGHLIGHT = 24
 LABEL_PADDING = 4
 LABEL_SEARCH_RADIUS = 100
 LABEL_STEP = 10
@@ -178,15 +190,8 @@ else:
     font_path = "/System/Library/Fonts/Supplemental/Arial.ttf"
 try:
     base_font = ImageFont.truetype(font_path, FONT_SIZE)
-    highlight_font = ImageFont.truetype(font_path, FONT_SIZE_HIGHLIGHT)
 except OSError:
-    base_font = highlight_font = ImageFont.load_default()
-
-def get_fonts(is_trader):
-    return (highlight_font if is_trader else base_font), \
-           ("green" if is_trader else "red"), \
-           ("blue" if is_trader else "black"), \
-           (DOT_RADIUS_HIGHLIGHT if is_trader else DOT_RADIUS)
+    base_font = ImageFont.load_default()
 
 # === BIOME SETUP ===
 biome_img = None
@@ -311,11 +316,12 @@ categorized_points, excluded_names, missing_names = parse_and_categorize_prefabs
 )
 
 # === RENDER ===
+global_rejection_total = 0
 def render_category_layer(category, points, config, display_names, tiers, tier_colors, legend_entries, poi_counter):
     from PIL import ImageDraw, Image
 
     print(f"Rendering layer '{category}' with {len(points)} points...")
-
+    rejection_attempts = 0
     points_img = Image.new("RGBA", config.image_size, (255, 255, 255, 0))
     labels_img = Image.new("RGBA", config.image_size, (255, 255, 255, 0))
     points_draw = ImageDraw.Draw(points_img)
@@ -336,7 +342,7 @@ def render_category_layer(category, points, config, display_names, tiers, tier_c
 
         if config.args.verbose:
             tier_str = f" (Tier {tier})" if tier is not None else ""
-            config.verbose_log_file.write(f"{poi_id},{name},{display},{tier},{dot_color}\n")
+            config.verbose_log_file.write(f"{poi_id},{name},{display}{tier_str},{dot_color},rendered\n")
 
         if config.args.bounding_boxes:
             size = 8  # fallback if no size
@@ -450,12 +456,65 @@ def render_category_layer(category, points, config, display_names, tiers, tier_c
 
             text_x = label_box[0] + LABEL_PADDING
             text_y = label_box[1] + LABEL_PADDING
-            labels_draw.line((px, pz, text_x, text_y), fill="gray", width=1)
-            for ox in (-1, 0, 1):
-                for oy in (-1, 0, 1):
-                    if ox != 0 or oy != 0:
-                        labels_draw.text((text_x + ox, text_y + oy), display, fill="white", font=config.font)
-            labels_draw.text((text_x, text_y), display, fill="black", font=config.font)
+            
+            
+            # Check prefab label mask before drawing
+            should_draw_label = True
+            if label_mask:
+                lx = int(round(text_x))
+                ly = int(round(text_y))
+                if 0 <= lx < label_mask.width and 0 <= ly < label_mask.height:
+                    r, g, b = label_mask.getpixel((lx, ly))
+                    if (r, g, b) == LABEL_MASK_RED:
+                        # Try to nudge slightly to green, but ensure label box stays out of red
+                        found = False
+                        bbox = labels_draw.textbbox((0, 0), display, font=config.font)
+                        text_width = bbox[2] - bbox[0]
+                        text_height = bbox[3] - bbox[1]
+                    
+                        for dy in range(-LABEL_MASK_SEARCH_RADIUS, LABEL_MASK_SEARCH_RADIUS + 1):
+                            for dx in range(-LABEL_MASK_SEARCH_RADIUS, LABEL_MASK_SEARCH_RADIUS + 1):
+                                nx = lx + dx
+                                ny = ly + dy
+                    
+                                # Define label box corners
+                                x1, y1 = nx, ny
+                                x2, y2 = nx + text_width, ny + text_height
+                    
+                                # Check bounds
+                                if x2 >= label_mask.width or y2 >= label_mask.height or x1 < 0 or y1 < 0:
+                                    continue
+                    
+                                # Check corners and center of bounding box
+                                corners = [
+                                    (x1, y1), (x2, y1), (x1, y2), (x2, y2),
+                                    ((x1 + x2) // 2, (y1 + y2) // 2)
+                                ]
+                            else:
+
+                                if all(label_mask.getpixel((cx, cy)) != LABEL_MASK_RED for cx, cy in corners):
+                                    text_x = nx
+                                    text_y = ny
+                                    found = True
+                                    break
+                            if found:
+                                break
+                    
+                        if not found:
+#                            print(f"[DEBUG] Rejected: {poi_id} → {display} — no safe label position found.")
+                            should_draw_label = False
+                            rejection_attempts += 1  # 🧮 Count 1 skipped label
+#                            print(f"[DEBUG] rejection_attempts = {rejection_attempts}")
+                            if config.args.verbose and config.verbose_log_file:
+                                config.verbose_log_file.write(f"{poi_id},{name},{display}{tier_str},{dot_color},skipped (blocked by red zone at {text_x},{text_y})\n")
+
+            if should_draw_label:
+                labels_draw.line((px, pz, text_x, text_y), fill="gray", width=1)
+                for ox in (-1, 0, 1):
+                    for oy in (-1, 0, 1):
+                        if ox != 0 or oy != 0:
+                            labels_draw.text((text_x + ox, text_y + oy), display, fill="white", font=config.font)
+                labels_draw.text((text_x, text_y), display, fill="black", font=config.font)
 
     # Save output images
     points_path = os.path.join(config.output_dir, f"{category}_points.png")
@@ -467,16 +526,15 @@ def render_category_layer(category, points, config, display_names, tiers, tier_c
         combined = Image.alpha_composite(points_img, labels_img)
         combined_path = os.path.join(config.combined_dir, f"{category}_combined.png")
         combined.save(combined_path)
-        return combined_path, poi_counter
-
-    return None, poi_counter
+        return combined_path, poi_counter, rejection_attempts
+    return None, poi_counter, rejection_attempts
 
 layer_files = []
 poi_counter = 0
 legend_entries = []
 
 for category, points in categorized_points.items():
-    combined_path, poi_counter = render_category_layer(
+    combined_path, poi_counter, rejection_attempts = render_category_layer(
         category,
         points,
         config,
@@ -486,6 +544,7 @@ for category, points in categorized_points.items():
         legend_entries,
         poi_counter
     )
+    global_rejection_total += rejection_attempts
     if combined_path:
         layer_files.append(combined_path)
 
@@ -564,7 +623,6 @@ def render_legend_overlay(legend_entries, config):
 if config.args.numbered_dots:
     render_legend_overlay(legend_entries, config)
 
-
 # === Combined map output ===
 def render_combined_map(layer_files, config):
     if not layer_files:
@@ -588,6 +646,9 @@ def finalize_logs(config, missing_names, excluded_names):
             for name in sorted(missing_names):
                 f.write(f"{name}\n")
         print(f"📝 Missing display names written to: {config.missing_log}")
+
+    if config.args.verbose and config.verbose_log_file:
+        config.verbose_log_file.write(f"Summary,of,rejected,labels:,{global_rejection_total} label placements rejected across all layers\n")
 
     if config.verbose_log_file:
         config.verbose_log_file.close()

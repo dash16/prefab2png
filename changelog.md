@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.4.2
+
+- Introduced red/green label placement mask to reduce visual clutter and avoid map obstructions.
+- Labels now avoid red zones during rendering, and skip placement entirely if no safe location can be found.
+- Skipped labels are logged in `verbose_log.txt` with coordinates and prefab name.
+- Final line in `verbose_log.txt` now includes a summary count of all label placement rejections.
+- Cleaned up unused highlight label logic (`highlight_font`, `get_fonts()`).
+- Included in this release is the file `prefab_label_mask_optimized.gif`, which defines safe label placement zones. This can be edited to exclude locations you don't want labels drawn in (red) and places it is safe to place a label (green).
+
+### Known Issues
+- ~151 POIs are not currently labeled due to red zone overlap and lack of fallback positioning logic.
+- This is a temporary limitation; future versions will recover these labels using advanced placement strategies.
+
 ## v0.4.1
 
 - ✨ **POI ID Badges**  

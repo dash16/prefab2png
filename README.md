@@ -26,11 +26,14 @@ Prefab difficulty tiers (0–5) are color-coded based on an optional `diff.csv` 
 
 ## 🔧 Features
 
-- 🧱 Modular architecture with pluggable components (Config, parser, renderer)
+- 🧩 Modular codebase: easier to extend, test, and debug
+- ⚡ Up to 10× faster rendering due to placement optimizations
 - 🗺️ Renders 6145x6145 PNG layers
 - 🎨 Color-coded prefab difficulty dot, label and line (via `diff.csv`)
 - 📍 Text labels showing Display Names for each prefab, with overlap avoidance and connector lines
+  - 🧼 Legend only shows skipped labels (not all POIs)
 - 🧹 Prefab filtering with built-in exclusions and biome categorization
+- ✍️ Smart label placement with blue zone targeting
 - 🔎 Verbose logging and display name fallback
 - 📍Unique `POI_ID` markers rendered on the map (optional via `--numbered-dots`)
 - 📁 Output directory includes points, labels, and optionally combined layers

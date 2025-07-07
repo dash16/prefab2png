@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.5
+
+- Modularized project structure:
+  - `main.py`, `render.py`, `labeler.py`, `filters.py`, `parse.py`
+- Improved label placement logic:
+  - Prefers blue zones, avoids red, snaps to left edge
+  - Stacks labels without overlap
+- Accurate legend behavior:
+  - Skipped POIs only appear in `poi_legend.png`
+  - Debug mode (`--skip-layers`) shows placeholder entry
+- Removed fallback label placement that violated collision rules
+- Full verbose logging: rendered vs. skipped POIs
+- Visual improvements:
+  - Background shading in legend zones
+  - Two-column layout with right overflow
+- Performance improvements:
+  - Label placement is fast even in large zones
+- Cleaned up legacy code and false starts
+- Simplified mask file, `prefab_label_mask_optimized.gif` is now `mask.gif`
+
 ## v0.4.3
 - Overhauled label placement system using a `prefab_label_mask_optimized.gif` mask
 - Introduced preferred blue zones for label snapping and stacking

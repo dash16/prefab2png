@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.4.3
+- Overhauled label placement system using a `prefab_label_mask_optimized.gif` mask
+- Introduced preferred blue zones for label snapping and stacking
+- Labels now snap to the left edge of blue boxes and stack downward
+- Labels fallback to POI_ID and appear in a new legend overlay when placement fails
+- Connector lines and label text now color-match the POI difficulty tier
+- Major performance improvements via blue zone caching
+- Removed spiral search logic in favor of direct blue zone targeting
+- Added support for `--skip-layers` flag to debug legend rendering independently
+- Cleaned up line rendering logic and eliminated redundant draw calls
+- Prepared groundwork for further modular code refactor (coming in v0.5)
+
 ## v0.4.2
 
 - Introduced red/green label placement mask to reduce visual clutter and avoid map obstructions.

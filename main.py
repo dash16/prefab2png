@@ -23,12 +23,16 @@ biome_img = load_biome_image(config.biome_path, config.image_size)
 # === Label Mask ===
 label_mask = None
 blue_zones = []
-if os.path.exists(LABEL_MASK_PATH):
-    label_mask = Image.open(LABEL_MASK_PATH).convert("RGB")
-    blue_zones = extract_blue_zones(label_mask, LABEL_MASK_BLUE)
-    print(f"✅ Loaded label mask with {len(blue_zones)} blue zones.")
+
+if args.no_mask:
+    print("🚫 Skipping mask: --no-mask flag set.")
 else:
-    print(f"⚠️ Label mask not found: {LABEL_MASK_PATH}")
+    if os.path.exists(LABEL_MASK_PATH):
+        label_mask = Image.open(LABEL_MASK_PATH).convert("RGB")
+        blue_zones = extract_blue_zones(label_mask, LABEL_MASK_BLUE)
+        print(f"✅ Loaded label mask with {len(blue_zones)} blue zones.")
+    else:
+        print(f"⚠️ Label mask not found: {LABEL_MASK_PATH}")
 
 # === Parse prefabs.xml ===
 def parse_prefabs(xml_path, biome_img, config):
@@ -58,13 +62,10 @@ def parse_prefabs(xml_path, biome_img, config):
         x, _, z = map(float, pos.split(","))
         px, pz = transform_coords(x, z)
 
-        if "player_start" in name:
-            if config.args.with_player_starts:
-                category = "player_starts"
-            else:
-                excluded_names["excluded"].add(name)
-                continue
-        elif name.startswith("street_") and "street_light" not in name:
+        # Determine category
+        if name.startswith("playerstart") or name.startswith("player_start"):
+            category = "player_starts"
+        elif (name.startswith("street_") or name.startswith("streets_")) and not name.endswith("light"):
             category = "streets"
         elif name.startswith("sign_260") or name.startswith("sign_73"):
             category = "streets"
@@ -105,6 +106,7 @@ if not args.skip_layers:
             label_mask=label_mask,
             blue_zones=blue_zones,
             red_rgb=LABEL_MASK_RED,
+            blue_rgb=LABEL_MASK_BLUE,
             numbered_dots=args.numbered_dots
         )
         if combined_path:

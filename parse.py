@@ -19,6 +19,7 @@ parser.add_argument("--with-player-starts", action="store_true")
 parser.add_argument("--log-missing", action="store_true")
 parser.add_argument("--numbered-dots", action="store_true")
 parser.add_argument("--skip-layers", action="store_true")
+parser.add_argument("--no-mask", action="store_true", help="Disable mask-based red/blue zone logic")
 args = parser.parse_args()
 
 # === CONFIGURATION ===
@@ -34,7 +35,7 @@ class Config:
         self.output_dir = "output"
         self.combined_dir = os.path.join(self.output_dir, "combined")
         self.missing_log = os.path.join(self.output_dir, "missing_display_names.txt")
-        self.verbose_log = os.path.join(self.output_dir, "verbose_log.txt")
+        self.verbose_log = os.path.join(self.output_dir, "verbose_log.csv")
         self.excluded_log = os.path.join(self.output_dir, "excluded_prefabs.txt")
 
         self.xml_path, self.localization_path, self.biome_path = self.resolve_paths()

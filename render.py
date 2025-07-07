@@ -31,6 +31,7 @@ def render_category_layer(
     label_mask,
     blue_zones,
     red_rgb,
+    blue_rgb,
     numbered_dots=False
 ):
     """
@@ -38,8 +39,118 @@ def render_category_layer(
     Returns the combined image path if combined output is enabled.
     """
     print(f"Rendering layer '{category}' with {len(points)} points...")
-    is_street_layer = (category == "streets")
 
+    from labeler import find_label_position_near_dot, find_label_position_in_blue_zone
+
+    points_img = Image.new("RGBA", config.image_size, (255, 255, 255, 0))
+    labels_img = Image.new("RGBA", config.image_size, (255, 255, 255, 0))
+    points_draw = ImageDraw.Draw(points_img)
+    labels_draw = ImageDraw.Draw(labels_img)
+    blue_zone_stack_tops = {}
+    font = config.font
+    occupied_boxes = []
+    rejection_attempts = 0
+
+    for poi_id, name, px, pz in points:
+        display = display_names.get(name, name)
+        tier = tiers.get(name, -1)
+        dot_color = tier_colors.get(tier, "#FF0000")
+
+        place_in_blue_zone = label_mask and label_mask.getpixel((px, pz)) == red_rgb
+
+        if place_in_blue_zone:
+            result = find_label_position_in_blue_zone(
+                px, pz, display, font, blue_zones, blue_zone_stack_tops, label_mask, red_rgb
+            )
+        elif category not in ("player_starts", "streets"):
+            result = find_label_position_near_dot(
+                px, pz, display, font, label_mask, red_rgb, blue_rgb, occupied_boxes
+            )
+        else:
+            # Unconstrained direct placement for player_starts and streets
+                pad = config.label_padding
+                text_x = px + pad
+                text_y = pz + pad + 4
+                wrapped_lines = wrap_label(display, font, max_width=200)
+                final_box = get_text_box(text_x, text_y, wrapped_lines, font)
+                label_x, label_y = text_x, text_y
+                result = (label_x, label_y, wrapped_lines, final_box)
+                
+        if result:
+            label_x, label_y, wrapped_lines, final_box = result
+            line_height = font.getbbox("Ay")[3] - font.getbbox("Ay")[1]
+            for i, line in enumerate(wrapped_lines):
+                ty = label_y + i * line_height
+                for ox in (-1, 0, 1):
+                    for oy in (-1, 0, 1):
+                        if ox or oy:
+                            labels_draw.text((label_x + ox, ty + oy), line, fill="white", font=font)
+                labels_draw.text((label_x, ty), line, fill=dot_color, font=font)
+
+            # Connector line
+            label_mid_y = label_y + (line_height * len(wrapped_lines)) // 2
+            text_w = max((font.getbbox(line)[2] for line in wrapped_lines), default=0)
+            anchor_x = label_x if label_x > px else label_x + text_w
+            labels_draw.line([(px, pz), (anchor_x, label_mid_y)], fill="white", width=4)
+            labels_draw.line([(px, pz), (anchor_x, label_mid_y)], fill=dot_color, width=2)
+
+            occupied_boxes.append(final_box)
+
+            if config.args.verbose and config.verbose_log_file:
+                tier_str = f" (Tier {tier})" if tier >= 0 else ""
+                config.verbose_log_file.write(f"{poi_id},{name},{display}{tier_str},{dot_color},rendered\n")
+        else:
+            if category not in ("player_starts", "streets"):
+                legend_entries[poi_id] = display
+                if not numbered_dots:
+                    bbox = labels_draw.textbbox((0, 0), poi_id, font=font)
+                    w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                    pad = 4
+                    label_box = (px - w//2 - pad, pz - h//2 - pad, px + w//2 + pad, pz + h//2 + pad)
+                    points_draw.rounded_rectangle(label_box, radius=4, fill="white", outline="black")
+                    labels_draw.text((px - w//2, pz - h//2), poi_id, fill="black", font=font)
+                rejection_attempts += 1
+                if config.args.verbose and config.verbose_log_file:
+                    tier_str = f" (Tier {tier})" if tier >= 0 else ""
+                    config.verbose_log_file.write(f"{poi_id},{name},{display}{tier_str},{dot_color},skipped (fallback to legend)\n")
+
+        # Draw prefab dot
+        r = config.dot_radius
+        points_draw.ellipse((px - r - 1, pz - r - 1, px + r + 1, pz + r + 1), fill="white")
+        points_draw.ellipse((px - r, pz - r, px + r, pz + r), fill=dot_color)
+
+    points_path = os.path.join(config.output_dir, f"{category}_points.png")
+    labels_path = os.path.join(config.output_dir, f"{category}_labels.png")
+    points_img.save(points_path)
+    labels_img.save(labels_path)
+
+    if config.args.combined:
+        combined = Image.alpha_composite(points_img, labels_img)
+        combined_path = os.path.join(config.combined_dir, f"{category}_combined.png")
+        combined.save(combined_path)
+        return combined_path, rejection_attempts
+
+    return None, rejection_attempts
+    category,
+    points,
+    config,
+    display_names,
+    tiers,
+    tier_colors,
+    legend_entries,
+    label_mask,
+    blue_zones,
+    red_rgb,
+    numbered_dots=False
+
+    """
+    Renders a single prefab category (e.g., streets, biome_desert) to dot and label PNG layers.
+    Returns the combined image path if combined output is enabled.
+    """
+    print(f"Rendering layer '{category}' with {len(points)} points...")
+    is_street_layer = (category == "streets")
+    from labeler import find_label_position_near_dot
+    
     # Create new image layers
     points_img = Image.new("RGBA", config.image_size, (255, 255, 255, 0))
     labels_img = Image.new("RGBA", config.image_size, (255, 255, 255, 0))
@@ -54,7 +165,7 @@ def render_category_layer(
     for poi_id, name, px, pz in points:
         display = display_names.get(name, name)
         tier = tiers.get(name, -1)
-        dot_color = tier_colors.get(tier, "#888888")
+        dot_color = tier_colors.get(tier, "#FF0000")
 
         # Draw prefab dot
         r = config.dot_radius

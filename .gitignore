@@ -5,6 +5,7 @@
 prefab2pngdev.py
 output/
 output.old/
+backups/
 
 # Regression testing tools (local-only)
 regression_test.py

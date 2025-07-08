@@ -103,12 +103,46 @@ def render_category_layer(
             if category not in ("player_starts", "streets"):
                 legend_entries[poi_id] = display
                 if not numbered_dots:
-                    bbox = labels_draw.textbbox((0, 0), poi_id, font=font)
-                    w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-                    pad = 4
-                    label_box = (px - w//2 - pad, pz - h//2 - pad, px + w//2 + pad, pz + h//2 + pad)
-                    points_draw.rounded_rectangle(label_box, radius=4, fill="white", outline="black")
-                    labels_draw.text((px - w//2, pz - h//2), poi_id, fill="black", font=font)
+                    # Try to place POI_ID using green zone logic
+                    id_label = poi_id
+                    poi_result = find_label_position_near_dot(
+                        px, pz, id_label, font, label_mask, red_rgb, blue_rgb, occupied_boxes
+                    )
+        
+                    if poi_result:
+                        label_x, label_y, lines, box = poi_result
+                        line_height = font.getbbox("Ay")[3] - font.getbbox("Ay")[1]
+                        # Draw white rounded background
+                        pad = 4
+                        box_x1, box_y1, box_x2, box_y2 = box
+                        labels_draw.rounded_rectangle((box_x1, box_y1, box_x2, box_y2), radius=4, fill="white", outline="black")
+                        
+                        # Connector line from dot to middle of label
+                        label_mid_y = label_y + (line_height * len(lines)) // 2
+                        text_w = max((font.getbbox(line)[2] for line in lines), default=0)
+                        anchor_x = label_x if label_x > px else label_x + text_w
+                        labels_draw.line([(px, pz), (anchor_x, label_mid_y)], fill="white", width=4)
+                        labels_draw.line([(px, pz), (anchor_x, label_mid_y)], fill="black", width=2)
+                        
+                        # Draw text
+                        for i, line in enumerate(lines):
+                            ty = label_y + i * line_height
+                            for ox in (-1, 0, 1):
+                                for oy in (-1, 0, 1):
+                                    if ox or oy:
+                                        labels_draw.text((label_x + ox, ty + oy), line, fill="white", font=font)
+                            labels_draw.text((label_x, ty), line, fill="black", font=font)
+                        
+                        occupied_boxes.append(box)
+        
+                    else:
+                        # Fallback to drawing centered on dot
+                        bbox = labels_draw.textbbox((0, 0), poi_id, font=font)
+                        w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                        pad = 4
+                        label_box = (px - w//2 - pad, pz - h//2 - pad, px + w//2 + pad, pz + h//2 + pad)
+                        points_draw.rounded_rectangle(label_box, radius=4, fill="white", outline="black")
+                        labels_draw.text((px - w//2, pz - h//2), poi_id, fill="black", font=font)
                 rejection_attempts += 1
                 if config.args.verbose and config.verbose_log_file:
                     tier_str = f" (Tier {tier})" if tier >= 0 else ""

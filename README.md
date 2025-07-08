@@ -34,6 +34,7 @@ Prefab difficulty tiers (0–5) are color-coded based on an optional `diff.csv` 
   - 🧼 Legend only shows skipped labels (not all POIs)
 - 🧹 Prefab filtering with built-in exclusions and biome categorization
 - ✍️ Smart label placement with blue zone targeting
+  - Smart green zone placement with vertical, horizontal, and diagonal fallback
 - 🔎 Verbose logging and display name fallback
 - 📍Unique `POI_ID` markers rendered on the map (optional via `--numbered-dots`)
 - 📁 Output directory includes points, labels, and optionally combined layers
@@ -53,6 +54,7 @@ python3 prefab2png.py \
   --log-missing \
   --verbose \
   --skip-layers \
+  --no-mask \ 
 
 ```
 ## 🖥️ Requirements

@@ -1,5 +1,20 @@
 # Changelog
 
+# Changelog
+
+## v0.5.1
+- Improved green zone label placement:
+  - Introduced vertical-first nudging with red/blue zone avoidance
+  - Added horizontal fallback if vertical fails
+  - Added diagonal fallback if both vertical and horizontal fail
+- Reduced skipped labels from 118 → 14 with negligible performance impact
+- Labels now avoid overlapping each other and red zones more reliably
+- POI_ID fallback labels (for skipped entries) now use green zone logic
+- POI_ID fallback boxes include background + connector line to dot
+- Added `--no-mask` flag to bypass label mask for modded/RNG worlds
+- Updated `verbose_log.txt` to save as `.csv`
+- Refined logic to exclude `player_starts` and `streets` from label constraints and legend
+
 ## v0.5
 
 - Modularized project structure:

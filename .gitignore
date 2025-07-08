@@ -4,12 +4,7 @@
 # Project files
 prefab2pngdev.py
 output/
-output.old/
-backups/
-
-# Regression testing tools (local-only)
-regression_test.py
-golden_outputs/
+--no-mask output/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

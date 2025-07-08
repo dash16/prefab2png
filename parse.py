@@ -10,17 +10,32 @@ from collections import defaultdict, namedtuple, deque
 # === ARGUMENT PARSING ===
 import argparse
 parser = argparse.ArgumentParser(description="Render 7DTD prefab map layers.")
-parser.add_argument("--xml", type=str)
-parser.add_argument("--localization", type=str)
-parser.add_argument("--biomes", type=str)
-parser.add_argument("--verbose", action="store_true")
-parser.add_argument("--combined", action="store_true")
-parser.add_argument("--with-player-starts", action="store_true")
-parser.add_argument("--log-missing", action="store_true")
-parser.add_argument("--numbered-dots", action="store_true")
-parser.add_argument("--skip-layers", action="store_true")
+parser.add_argument("--xml", type=str, help="Full path to prefabs.xml")
+parser.add_argument("--localization", type=str, help="Full path to Localization.txt")
+parser.add_argument("--biomes", type=str, help="Full path to biomes.png")
+parser.add_argument("--verbose", action="store_true", help="Enable verbose prefab name and tier logging.")
+parser.add_argument("--combined", action="store_true", help="Generate combined PNG layers.")
+parser.add_argument("--with-player-starts", action="store_true", help="Include 'player_starts' layer.")
+parser.add_argument("--log-missing", action="store_true", help="Log prefabs missing display names.")
+parser.add_argument("--numbered-dots", action="store_true", help="Replace prefab dots with unique POI IDs.")
+parser.add_argument("--skip-layers", action="store_true", help="Skip rendering prefab layers and go directly to legend rendering.")
 parser.add_argument("--no-mask", action="store_true", help="Disable mask-based red/blue zone logic")
+parser.add_argument("--only-biomes", nargs="+", metavar="BIOME", help="Only render the specified biome layers. Options: pine_forest, desert, snow, burnt_forest, wasteland."
+)
+
+# Validate arguments input early
+# only-biomes
+valid_biomes = {"pine_forest", "desert", "snow", "burnt_forest", "wasteland"}
+
 args = parser.parse_args()
+
+if args.only_biomes:
+    invalid = set(args.only_biomes) - valid_biomes
+    if invalid:
+        parser.error(
+            f"Invalid biome name(s): {', '.join(invalid)}\n"
+            f"Valid options: {', '.join(sorted(valid_biomes))}"
+        )
 
 # === CONFIGURATION ===
 class Config:
@@ -179,3 +194,37 @@ def extract_blue_zones(mask_img, blue_rgb=(0, 42, 118)):
                 blue_zones.append(flood_fill(x, y))
 
     return blue_zones
+
+# Extract dot centers from each category for collision/density use
+def determine_category(name, px, pz, biome_img):
+    name = name.lower()
+    if name.startswith("playerstart") or name.startswith("player_start"):
+        return "player_starts"
+    if (name.startswith("street_") or name.startswith("streets_")) and not name.endswith("light"):
+        return "streets"
+    if name.startswith("sign_260") or name.startswith("sign_73"):
+        return "streets"
+
+    biome_name = "unknown"
+    if biome_img:
+        rgb = biome_img.getpixel((px, pz))
+        biome_name = get_biome_name(rgb)
+    return f"biome_{biome_name}"
+
+def categorize_points(prefabs, display_names, tier_data, biome_image):
+    categorized_points = {}
+    dot_centers_by_category = {}
+
+    for poi_id, name, px, pz in prefabs:
+        display = display_names.get(name.lower(), name)
+        tier = tier_data.get(name.lower(), None)
+
+        category = determine_category(name, px, pz, biome_image)
+        if category not in categorized_points:
+            categorized_points[category] = []
+            dot_centers_by_category[category] = []
+
+        categorized_points[category].append((poi_id, display, px, pz))
+        dot_centers_by_category[category].append((px, pz))
+
+    return categorized_points, dot_centers_by_category

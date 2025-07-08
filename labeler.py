@@ -1,4 +1,7 @@
 # labeler.py
+import os
+os.makedirs("output", exist_ok=True)
+green_zone_debug = open(os.path.join("output", "green_zone_debug.txt"), "w")
 
 def boxes_overlap(box1, box2):
     """Return True if two filled rectangles overlap in any way, including touching."""
@@ -14,6 +17,21 @@ def check_label_overlap(rect, placed_rects):
     for other in placed_rects:
         if boxes_overlap(rect, other):
             return True
+    return False
+
+def check_dot_overlap(candidate_box, dot_centers, dot_radius=5, stroke_width=2):
+    """Returns True if the label box overlaps any POI dot."""
+    buffer = dot_radius + stroke_width
+    x1, y1, x2, y2 = candidate_box
+    
+    for cx, cy in dot_centers:
+        # Define bounding box around the dot
+        dot_box = (cx - buffer, cy - buffer, cx + buffer, cy + buffer)
+    
+        # Check for overlap with label box
+        if not (x2 < dot_box[0] or x1 > dot_box[2] or y2 < dot_box[1] or y1 > dot_box[3]):
+            return True
+    
     return False
 
 def wrap_label(text, font, max_width):
@@ -69,14 +87,14 @@ def is_placeable(rect_coords, label_mask, red_rgb, blue_rgb=None, red_corner_tol
 
     return red_corners <= red_corner_tolerance
 
-def find_label_position_near_dot(dot_px, dot_pz, display, font, label_mask, red_rgb, blue_rgb, occupied_boxes):
+def find_label_position_near_dot(dot_px, dot_pz, display, font, label_mask, red_rgb, blue_rgb, occupied_boxes, dot_centers, log):
     """
     Tries to find an acceptable area in green zone that does not overlap with existing labels.
     First attempts vertical offsets, then horizontal as fallback.
     """
     pad = 4
-    text_x = dot_px + pad
-    text_y = dot_pz + pad + 4
+    text_x = dot_px + pad + 5  # extra 5px skew for wedge visibility
+    text_y = dot_pz + pad + 9
     
     # Wrap the label and calculate height for vertical offset
     line_height = font.getbbox("Ay")[3] - font.getbbox("Ay")[1]
@@ -85,15 +103,18 @@ def find_label_position_near_dot(dot_px, dot_pz, display, font, label_mask, red_
     wrapped = wrap_label(display, font, max_width=200)
 
     # Pass 1: vertical placement
+    log(f"Trying vertical offsets for {display}") #debug
     for dy in vertical_offsets:
         label_y = text_y + dy
         candidate_box = get_text_box(text_x, label_y, wrapped, font)
         if is_placeable(candidate_box, label_mask, red_rgb, blue_rgb):
-            if not check_label_overlap(candidate_box, occupied_boxes):
+            if not check_label_overlap(candidate_box, occupied_boxes) and not check_dot_overlap(candidate_box, dot_centers):
+                log(f"✅ Placed using vertical for {display}")
                 return text_x, label_y, wrapped, candidate_box
 
     # Pass 2: horizontal fallback : try horizontal placement using label width as nudge size
     # This calculates the total width of the wrapped label
+    log(f"Trying horizontal fallback for {display}") #debug
     max_line_width = max((font.getbbox(line)[2] - font.getbbox(line)[0]) for line in wrapped)
     step = max_line_width // 2
     horizontal_offsets = [i * step for i in (1, -1, 2, -2, 3, -3, 4, -4)]
@@ -102,10 +123,12 @@ def find_label_position_near_dot(dot_px, dot_pz, display, font, label_mask, red_
         label_y = text_y
         candidate_box = get_text_box(label_x, label_y, wrapped, font)
         if is_placeable(candidate_box, label_mask, red_rgb, blue_rgb):
-            if not check_label_overlap(candidate_box, occupied_boxes):
+            if not check_label_overlap(candidate_box, occupied_boxes) and not check_dot_overlap(candidate_box, dot_centers):
+                log(f"✅ Placed using horizontal for {display}")
                 return label_x, label_y, wrapped, candidate_box
     
     # Pass 3: Diagonal fallback (intercardinal)
+    log(f"Trying diagonal fallback for {display}") #debug
     for offset in range(1, 5):
         dx = (max_line_width // 2) * offset
         dy = line_height * offset
@@ -114,9 +137,11 @@ def find_label_position_near_dot(dot_px, dot_pz, display, font, label_mask, red_
             label_y = dot_pz + sign_y * dy + pad + 4
             candidate_box = get_text_box(label_x, label_y, wrapped, font)
             if is_placeable(candidate_box, label_mask, red_rgb, blue_rgb):
-                if not check_label_overlap(candidate_box, occupied_boxes):
+                if not check_label_overlap(candidate_box, occupied_boxes) and not check_dot_overlap(candidate_box, dot_centers):
+                    log(f"✅ Placed using diagonal for {display}")
                     return label_x, label_y, wrapped, candidate_box
     
+    log(f"❌ Failed to place label for {display} in any green zone position")
     return None
 
 def find_label_position_in_blue_zone(dot_px, dot_pz, display, font, blue_zones, zone_stack_tops, label_mask, red_rgb):

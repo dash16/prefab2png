@@ -1,7 +1,7 @@
 # render.py
 
 import os
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from filters import should_exclude
 from labeler import (
     wrap_label,
@@ -20,6 +20,68 @@ def boxes_overlap(box1, box2, padding=2):
         box1[1] - padding > box2[3]
     )
 
+# === Label helper ===
+def draw_label_wedge(draw, dot_x, dot_y, final_box, wrapped_lines, font, dot_radius, dot_color, padding=4):
+    """Draws a POI label with a wedge connector to the nearest label edge (left, right, top, or bottom)."""
+    LINE_WIDTH = 2
+    BOX_RADIUS = 8
+    LABEL_FILL = (255, 255, 255, 200)  # Semi-transparent white
+
+    x1, y1, x2, y2 = final_box
+    label_w = x2 - x1
+    label_h = y2 - y1
+
+    # Calculate edge distances
+    dist_left   = abs(dot_x - x1)
+    dist_right  = abs(dot_x - x2)
+    dist_top    = abs(dot_y - y1)
+    dist_bottom = abs(dot_y - y2)
+
+    # Determine closest edge
+    min_dist = min(dist_left, dist_right, dist_top, dist_bottom)
+    if min_dist == dist_left:
+        attach_side = "left"
+        anchor_top = (x1, y1 + padding)
+        anchor_bottom = (x1, y2 - padding)
+    elif min_dist == dist_right:
+        attach_side = "right"
+        anchor_top = (x2, y1 + padding)
+        anchor_bottom = (x2, y2 - padding)
+    elif min_dist == dist_top:
+        attach_side = "top"
+        anchor_top = (x1 + padding, y1)
+        anchor_bottom = (x2 - padding, y1)
+    else:
+        attach_side = "bottom"
+        anchor_top = (x1 + padding, y2)
+        anchor_bottom = (x2 - padding, y2)
+
+    # Draw wedge
+    wedge = [ (dot_x, dot_y), anchor_top, anchor_bottom ]
+    draw.polygon(wedge, fill=LABEL_FILL)
+
+    # Draw wedge edge lines
+    draw.line([dot_x, dot_y, *anchor_top], fill=dot_color, width=LINE_WIDTH)
+    draw.line([dot_x, dot_y, *anchor_bottom], fill=dot_color, width=LINE_WIDTH)
+
+    # Draw label box
+    draw.rounded_rectangle([x1, y1, x2, y2], radius=BOX_RADIUS, fill=LABEL_FILL, outline=dot_color, width=2)
+
+    # Draw each line of text centered
+    line_height = font.getbbox("Ay")[3] - font.getbbox("Ay")[1]
+    for i, line in enumerate(wrapped_lines):
+        bbox = font.getbbox(line)
+        text_w = bbox[2] - bbox[0]
+        ty = y1 + padding + i * line_height
+        tx = x1 + (label_w - text_w) // 2
+        draw.text((tx, ty), line, font=font, fill=dot_color)
+
+    # Draw the dot last, on top
+    draw.ellipse(
+        (dot_x - dot_radius, dot_y - dot_radius, dot_x + dot_radius, dot_y + dot_radius),
+        fill=dot_color, outline="white", width=2
+    )
+
 def render_category_layer(
     category,
     points,
@@ -32,6 +94,7 @@ def render_category_layer(
     blue_zones,
     red_rgb,
     blue_rgb,
+    log,
     numbered_dots=False
 ):
     """
@@ -39,7 +102,7 @@ def render_category_layer(
     Returns the combined image path if combined output is enabled.
     """
     print(f"Rendering layer '{category}' with {len(points)} points...")
-
+    dot_centers = [(px, pz) for _, _, px, pz in points]
     from labeler import find_label_position_near_dot, find_label_position_in_blue_zone
 
     points_img = Image.new("RGBA", config.image_size, (255, 255, 255, 0))
@@ -64,7 +127,7 @@ def render_category_layer(
             )
         elif category not in ("player_starts", "streets"):
             result = find_label_position_near_dot(
-                px, pz, display, font, label_mask, red_rgb, blue_rgb, occupied_boxes
+                px, pz, display, font, label_mask, red_rgb, blue_rgb, occupied_boxes, dot_centers, log=log
             )
         else:
             # Unconstrained direct placement for player_starts and streets
@@ -76,9 +139,27 @@ def render_category_layer(
                 label_x, label_y = text_x, text_y
                 result = (label_x, label_y, wrapped_lines, final_box)
                 
-        if result:
+        if result and category not in ("player_starts", "streets"):
             label_x, label_y, wrapped_lines, final_box = result
+            text_w = max((font.getbbox(line)[2] for line in wrapped_lines), default=0)
             line_height = font.getbbox("Ay")[3] - font.getbbox("Ay")[1]
+            text_h = line_height * len(wrapped_lines)
+            
+            draw_label_wedge(
+                labels_draw,
+                dot_x=px,
+                dot_y=pz,
+                final_box=final_box,
+                wrapped_lines=wrapped_lines,
+                font=font,
+                dot_radius=config.dot_radius,
+                dot_color=dot_color
+            )
+            occupied_boxes.append(final_box)
+
+        elif result and category in ("player_starts", "streets"):
+            line_height = font.getbbox("Ay")[3] - font.getbbox("Ay")[1]
+        
             for i, line in enumerate(wrapped_lines):
                 ty = label_y + i * line_height
                 for ox in (-1, 0, 1):
@@ -86,14 +167,14 @@ def render_category_layer(
                         if ox or oy:
                             labels_draw.text((label_x + ox, ty + oy), line, fill="white", font=font)
                 labels_draw.text((label_x, ty), line, fill=dot_color, font=font)
-
+        
             # Connector line
             label_mid_y = label_y + (line_height * len(wrapped_lines)) // 2
             text_w = max((font.getbbox(line)[2] for line in wrapped_lines), default=0)
             anchor_x = label_x if label_x > px else label_x + text_w
             labels_draw.line([(px, pz), (anchor_x, label_mid_y)], fill="white", width=4)
             labels_draw.line([(px, pz), (anchor_x, label_mid_y)], fill=dot_color, width=2)
-
+        
             occupied_boxes.append(final_box)
 
             if config.args.verbose and config.verbose_log_file:
@@ -106,7 +187,7 @@ def render_category_layer(
                     # Try to place POI_ID using green zone logic
                     id_label = poi_id
                     poi_result = find_label_position_near_dot(
-                        px, pz, id_label, font, label_mask, red_rgb, blue_rgb, occupied_boxes
+                        px, pz, id_label, font, label_mask, red_rgb, blue_rgb, occupied_boxes, dot_centers, log
                     )
         
                     if poi_result:
@@ -176,125 +257,3 @@ def render_category_layer(
     blue_zones,
     red_rgb,
     numbered_dots=False
-
-    """
-    Renders a single prefab category (e.g., streets, biome_desert) to dot and label PNG layers.
-    Returns the combined image path if combined output is enabled.
-    """
-    print(f"Rendering layer '{category}' with {len(points)} points...")
-    is_street_layer = (category == "streets")
-    from labeler import find_label_position_near_dot
-    
-    # Create new image layers
-    points_img = Image.new("RGBA", config.image_size, (255, 255, 255, 0))
-    labels_img = Image.new("RGBA", config.image_size, (255, 255, 255, 0))
-    points_draw = ImageDraw.Draw(points_img)
-    labels_draw = ImageDraw.Draw(labels_img)
-    blue_zone_stack_tops = {}  # For stacking labels within blue zones
-
-    occupied_boxes = []
-    pending_dot_labels = []
-    rejection_attempts = 0
-
-    for poi_id, name, px, pz in points:
-        display = display_names.get(name, name)
-        tier = tiers.get(name, -1)
-        dot_color = tier_colors.get(tier, "#FF0000")
-
-        # Draw prefab dot
-        r = config.dot_radius
-        points_draw.ellipse((px - r - 1, pz - r - 1, px + r + 1, pz + r + 1), fill="white")
-        points_draw.ellipse((px - r, pz - r, px + r, pz + r), fill=dot_color)
-
-        # POI ID mode
-        if numbered_dots:
-            bbox = labels_draw.textbbox((0, 0), poi_id, font=config.font)
-            w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-            pad = 4
-            label_box = (px - w//2 - pad, pz - h//2 - pad, px + w//2 + pad, pz + h//2 + pad)
-            points_draw.rounded_rectangle(label_box, radius=4, fill="white", outline="black")
-            labels_draw.text((px - w//2, pz - h//2), poi_id, fill="black", font=config.font)
-            continue
-        
-        # === Begin label logic ===
-        bbox = config.font.getbbox(display)
-        text_w = bbox[2] - bbox[0]
-        text_h = bbox[3] - bbox[1]
-        pad = config.label_padding
-        text_x = px + pad
-        text_y = pz + pad + 4
-        
-        wrapped = [display]
-        label_box = get_text_box(text_x, text_y, wrapped, config.font)
-        
-        if is_placeable(label_box, label_mask, red_rgb):
-            # Place label directly to the right of dot
-            label_x, label_y = text_x, text_y
-            final_lines = wrapped
-            final_box = label_box
-            found = True
-        else:
-            # Try placing inside a blue zone
-            result = find_label_position_in_blue_zone(
-                dot_px=px,
-                dot_pz=pz,
-                display=display,
-                font=config.font,
-                blue_zones=blue_zones,
-                zone_stack_tops=blue_zone_stack_tops,
-                label_mask=label_mask,
-                red_rgb=red_rgb
-            )
-        
-            if result:
-                label_x, label_y, final_lines, final_box = result
-                found = True
-            else:
-                found = False
-        
-        if found:
-            # Connector line
-            line_height = config.font.getbbox("Ay")[3] - config.font.getbbox("Ay")[1]
-            label_mid_y = label_y + (line_height * len(final_lines)) // 2
-            text_w = max((config.font.getbbox(line)[2] for line in final_lines), default=0)
-            anchor_x = label_x if label_x > px else label_x + text_w
-        
-            labels_draw.line([(px, pz), (anchor_x, label_mid_y)], fill="white", width=4)
-            labels_draw.line([(px, pz), (anchor_x, label_mid_y)], fill=dot_color, width=2)
-        
-            # Draw label text
-            for i, line in enumerate(final_lines):
-                ty = label_y + i * line_height
-                for ox in (-1, 0, 1):
-                    for oy in (-1, 0, 1):
-                        if ox or oy:
-                            labels_draw.text((label_x + ox, ty + oy), line, fill="white", font=config.font)
-                labels_draw.text((label_x, ty), line, fill=dot_color, font=config.font)
-        
-            occupied_boxes.append(final_box)
-        if config.args.verbose and config.verbose_log_file:
-            tier_str = f" (Tier {tier})" if tier >= 0 else ""
-            config.verbose_log_file.write(f"{poi_id},{name},{display}{tier_str},{dot_color},rendered\n")
-        
-        else:
-            # No valid placement: log to legend
-            legend_entries[poi_id] = display
-            rejection_attempts += 1
-            if config.args.verbose and config.verbose_log_file:
-                tier_str = f" (Tier {tier})" if tier >= 0 else ""
-                config.verbose_log_file.write(f"{poi_id},{name},{display}{tier_str},{dot_color},skipped (fallback to legend)\n")
-
-        
-    # Save output
-    points_path = os.path.join(config.output_dir, f"{category}_points.png")
-    labels_path = os.path.join(config.output_dir, f"{category}_labels.png")
-    points_img.save(points_path)
-    labels_img.save(labels_path)
-
-    if config.args.combined:
-        combined = Image.alpha_composite(points_img, labels_img)
-        combined_path = os.path.join(config.combined_dir, f"{category}_combined.png")
-        combined.save(combined_path)
-        return combined_path, rejection_attempts
-
-    return None, rejection_attempts

@@ -1,6 +1,36 @@
 # Changelog
 
-# Changelog
+## 📦 v0.5.2 — Green Zone Labeling Overhaul (2025-07-07)
+
+### ✨ Added
+- Full support for **green zone wedge labels** with white shaded connector logic
+- Smart **nudge-based label placement** for green zones:
+  - Vertical → Horizontal → Diagonal fallback
+  - Skips avoided in most scenarios
+- Labels now **avoid overlapping POI dots** (dot radius + stroke buffer respected)
+- Labels skew slightly when placed via green zone, creating space for visible wedges
+- Logging pipeline added:
+  - `--verbose` writes label placement logs to `output/green_zone_debug.txt`
+  - Easily extendable for future `--label-debug` flag
+
+### 🎨 Improved
+- Wedge drawing now integrated for both green and blue zone labels
+- Label box padding now consistent and visually aligned
+- Label collision logic restored and improved after regression in v0.5.1
+- `dot_centers` now passed through to assist in POI-aware label placement
+- Refactored logging to remove global state (`debug_log`) and inject `log()` cleanly
+
+### 🐛 Fixed
+- Fixed regression where wedge padding was misaligned
+- Restored label box width and height accuracy after font bbox tuning
+- Resolved duplicate label artifacts in overlapping POIs
+
+### 🧩 Known Issues (To be resolved in v0.6)
+- `--with-player-starts` flag not respected
+- `--numbered-dots` does not render POI_IDs
+- Green zone labels can occasionally spill into blue zone regions in ultra-dense areas
+- Wedge shape becomes too wide for top/bottom placements
+- POI dot still placed at prefab’s lower-left corner instead of center
 
 ## v0.5.1
 - Improved green zone label placement:

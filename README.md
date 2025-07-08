@@ -8,7 +8,7 @@
 
 This Python script renders layered map images from game files used by the game **7 Days to Die**. It creates layers of labeled points of interest (POIs) using in-game data, suitable for editing or display.
 
-**Version:** 0.5.0
+**Version:** 0.5.2
 **Author:** Dustin Newell  
 **License:** AGPL-3.0
 
@@ -55,6 +55,7 @@ python3 prefab2png.py \
   --verbose \
   --skip-layers \
   --no-mask \ 
+  --only-biomes \
 
 ```
 ## 🖥️ Requirements

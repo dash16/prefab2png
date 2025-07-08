@@ -14,6 +14,21 @@ LABEL_MASK_RED = (165, 27, 27)
 LABEL_MASK_GREEN = (0, 118, 0)
 LABEL_MASK_BLUE = (0, 42, 118)
 
+# === Logging Setup ===
+
+def null_log(msg):
+    pass
+
+def create_logger(verbose):
+    if verbose:
+        os.makedirs('output', exist_ok=True)
+        log_file = open("output/green_zone_debug.txt", "w")
+        def log(msg):
+            log_file.write(msg + "\n")
+            log_file.flush()
+        return log, log_file
+    return null_log, None
+
 # === Setup ===
 config = Config(args)
 display_names = load_display_names(config.localization_path)
@@ -33,6 +48,9 @@ else:
         print(f"✅ Loaded label mask with {len(blue_zones)} blue zones.")
     else:
         print(f"⚠️ Label mask not found: {LABEL_MASK_PATH}")
+
+# === Logger Setup ===
+log, log_file = create_logger(args.verbose)
 
 # === Parse prefabs.xml ===
 def parse_prefabs(xml_path, biome_img, config):
@@ -94,7 +112,25 @@ if args.skip_layers:
     legend_entries["P0000"] = "DEBUG TEST POI"
 
 if not args.skip_layers:
+    combined_path = None
     for category, points in categorized_points.items():
+        if args.only_biomes:
+            # Only render biome_* categories listed
+            if not category.startswith("biome_"):
+                continue
+            biome = category[len("biome_"):]
+            if biome not in args.only_biomes:
+                continue
+            # If --biomes not used, render everything
+        if args.only_biomes:
+            if not category.startswith("biome_"):
+                continue
+            biome = category[len("biome_"):]
+            if biome not in args.only_biomes:
+                continue
+
+        dot_centers = [(px, pz) for _, _, px, pz in points]
+
         combined_path, rejections = render_category_layer(
             category=category,
             points=points,
@@ -107,6 +143,7 @@ if not args.skip_layers:
             blue_zones=blue_zones,
             red_rgb=LABEL_MASK_RED,
             blue_rgb=LABEL_MASK_BLUE,
+            log=log,
             numbered_dots=args.numbered_dots
         )
         if combined_path:

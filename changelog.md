@@ -1,5 +1,24 @@
 # Changelog
 
+## [v0.5.3] - 2025-07-08
+
+### ✨ Added
+- Legend layout now supports 4 columns (2 left, 2 right) to accommodate large POI counts
+
+### 🐛 Fixed
+- `--numbered-dots` mode:
+  - Suppresses display name labels and wedges
+  - Renders POI_IDs directly on the map with white roundrects
+  - Ensures full 1:1 POI_ID → Display Name mapping in the legend
+  - Correctly applies tier-based color styling to each legend entry
+- `--with-player-starts` now correctly suppresses the `player_starts` layer unless explicitly enabled
+- Empty PNGs for prefab categories with 0 POIs are no longer written to disk
+- Duplicate biome filtering logic removed from the render loop
+
+### 🎨 Improved
+- Legend entries are styled with tier-colored text and rounded white backgrounds
+- Top/bottom wedge widths are clamped to avoid oversized connector triangles
+
 ## 📦 v0.5.2 — Green Zone Labeling Overhaul (2025-07-07)
 
 ### ✨ Added

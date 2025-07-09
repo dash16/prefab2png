@@ -20,55 +20,55 @@ def boxes_overlap(box1, box2, padding=2):
         box1[1] - padding > box2[3]
     )
 
-# === Label helper ===
-def draw_label_wedge(draw, dot_x, dot_y, final_box, wrapped_lines, font, dot_radius, dot_color, padding=4):
-    """Draws a POI label with a wedge connector to the nearest label edge (left, right, top, or bottom)."""
+# === Label helpers ===
+# === Wedge ===
+def draw_label_wedge_only(draw, dot_x, dot_y, final_box, padding=4, dot_color="black"):
+    """Draw only the wedge polygon and lines from dot to label box."""
     LINE_WIDTH = 2
-    BOX_RADIUS = 8
     LABEL_FILL = (255, 255, 255, 200)  # Semi-transparent white
 
     x1, y1, x2, y2 = final_box
-    label_w = x2 - x1
-    label_h = y2 - y1
 
-    # Calculate edge distances
     dist_left   = abs(dot_x - x1)
     dist_right  = abs(dot_x - x2)
     dist_top    = abs(dot_y - y1)
     dist_bottom = abs(dot_y - y2)
 
-    # Determine closest edge
     min_dist = min(dist_left, dist_right, dist_top, dist_bottom)
     if min_dist == dist_left:
-        attach_side = "left"
         anchor_top = (x1, y1 + padding)
         anchor_bottom = (x1, y2 - padding)
     elif min_dist == dist_right:
-        attach_side = "right"
         anchor_top = (x2, y1 + padding)
         anchor_bottom = (x2, y2 - padding)
     elif min_dist == dist_top:
-        attach_side = "top"
-        anchor_top = (x1 + padding, y1)
-        anchor_bottom = (x2 - padding, y1)
+        center = (x1 + x2) // 2
+        spread = min(20, (x2 - x1) // 2 - padding)
+        anchor_top = (center - spread, y1)
+        anchor_bottom = (center + spread, y1)
     else:
-        attach_side = "bottom"
-        anchor_top = (x1 + padding, y2)
-        anchor_bottom = (x2 - padding, y2)
+        center = (x1 + x2) // 2
+        spread = min(20, (x2 - x1) // 2 - padding)
+        anchor_top = (center - spread, y2)
+        anchor_bottom = (center + spread, y2)
 
-    # Draw wedge
     wedge = [ (dot_x, dot_y), anchor_top, anchor_bottom ]
     draw.polygon(wedge, fill=LABEL_FILL)
-
-    # Draw wedge edge lines
     draw.line([dot_x, dot_y, *anchor_top], fill=dot_color, width=LINE_WIDTH)
     draw.line([dot_x, dot_y, *anchor_bottom], fill=dot_color, width=LINE_WIDTH)
 
-    # Draw label box
+def draw_label_text_only(draw, wrapped_lines, font, final_box, dot_color="black"):
+    """Draw only the label box and wrapped text lines."""
+    BOX_RADIUS = 8
+    LABEL_FILL = (255, 255, 255, 200)
+    padding = 4
+
+    x1, y1, x2, y2 = final_box
+    label_w = x2 - x1
+    line_height = font.getbbox("Ay")[3] - font.getbbox("Ay")[1]
+
     draw.rounded_rectangle([x1, y1, x2, y2], radius=BOX_RADIUS, fill=LABEL_FILL, outline=dot_color, width=2)
 
-    # Draw each line of text centered
-    line_height = font.getbbox("Ay")[3] - font.getbbox("Ay")[1]
     for i, line in enumerate(wrapped_lines):
         bbox = font.getbbox(line)
         text_w = bbox[2] - bbox[0]
@@ -76,11 +76,6 @@ def draw_label_wedge(draw, dot_x, dot_y, final_box, wrapped_lines, font, dot_rad
         tx = x1 + (label_w - text_w) // 2
         draw.text((tx, ty), line, font=font, fill=dot_color)
 
-    # Draw the dot last, on top
-    draw.ellipse(
-        (dot_x - dot_radius, dot_y - dot_radius, dot_x + dot_radius, dot_y + dot_radius),
-        fill=dot_color, outline="white", width=2
-    )
 
 def render_category_layer(
     category,
@@ -112,8 +107,30 @@ def render_category_layer(
     blue_zone_stack_tops = {}
     font = config.font
     occupied_boxes = []
+    label_infos = []
     rejection_attempts = 0
+    if numbered_dots:
+        for poi_id, name, px, pz in points:
+            display = display_names.get(name, name)
+            legend_entries[poi_id] = (display_names.get(name, name), name)
 
+            bbox = font.getbbox(poi_id)
+            text_w = bbox[2] - bbox[0]
+            text_h = bbox[3] - bbox[1]
+            pad = 4
+            label_box = (
+                px - text_w // 2 - pad,
+                pz - text_h // 2 - pad,
+                px + text_w // 2 + pad,
+                pz + text_h // 2 + pad
+            )
+            labels_draw.rounded_rectangle(label_box, radius=4, fill="white", outline="black")
+            labels_draw.text((px - text_w // 2, pz - text_h // 2), poi_id, fill="black", font=font)
+
+        labels_path = os.path.join(config.output_dir, f"{category}_labels.png")
+        if points:
+            labels_img.save(labels_path)
+        return None, 0    
     for poi_id, name, px, pz in points:
         display = display_names.get(name, name)
         tier = tiers.get(name, -1)
@@ -145,16 +162,13 @@ def render_category_layer(
             line_height = font.getbbox("Ay")[3] - font.getbbox("Ay")[1]
             text_h = line_height * len(wrapped_lines)
             
-            draw_label_wedge(
-                labels_draw,
-                dot_x=px,
-                dot_y=pz,
-                final_box=final_box,
-                wrapped_lines=wrapped_lines,
-                font=font,
-                dot_radius=config.dot_radius,
-                dot_color=dot_color
-            )
+            label_infos.append({
+                "dot_x": px,
+                "dot_y": pz,
+                "wrapped_lines": wrapped_lines,
+                "final_box": final_box,
+                "dot_color": dot_color
+            })
             occupied_boxes.append(final_box)
 
         elif result and category in ("player_starts", "streets"):
@@ -182,7 +196,7 @@ def render_category_layer(
                 config.verbose_log_file.write(f"{poi_id},{name},{display}{tier_str},{dot_color},rendered\n")
         else:
             if category not in ("player_starts", "streets"):
-                legend_entries[poi_id] = display
+                legend_entries[poi_id] = (display_names.get(name, name), name)
                 if not numbered_dots:
                     # Try to place POI_ID using green zone logic
                     id_label = poi_id
@@ -229,10 +243,49 @@ def render_category_layer(
                     tier_str = f" (Tier {tier})" if tier >= 0 else ""
                     config.verbose_log_file.write(f"{poi_id},{name},{display}{tier_str},{dot_color},skipped (fallback to legend)\n")
 
-        # Draw prefab dot
+        if numbered_dots:
+            legend_entries[poi_id] = (display_names.get(name, name), name)
+            bbox = font.getbbox(poi_id)
+            text_w = bbox[2] - bbox[0]
+            text_h = bbox[3] - bbox[1]
+            pad = 4
+            label_box = (
+                px - text_w // 2 - pad,
+                pz - text_h // 2 - pad,
+                px + text_w // 2 + pad,
+                pz + text_h // 2 + pad
+            )
+            labels_draw.rounded_rectangle(label_box, radius=4, fill="white", outline="black")
+            labels_draw.text((px - text_w // 2, pz - text_h // 2), poi_id, fill="black", font=font)
+        else:
+            # Standard dot rendering
+            r = config.dot_radius
+            points_draw.ellipse((px - r - 1, pz - r - 1, px + r + 1, pz + r + 1), fill="white")
+            points_draw.ellipse((px - r, pz - r, px + r, pz + r), fill=dot_color)
+        
+    # First pass: draw all wedges
+    for info in label_infos:
+        draw_label_wedge_only(
+            draw=labels_draw,
+            dot_x=info["dot_x"],
+            dot_y=info["dot_y"],
+            final_box=info["final_box"],
+            dot_color=info["dot_color"]
+        )
+        
+    # Second pass: draw all label text and dots
+    for info in label_infos:
+        draw_label_text_only(
+            draw=labels_draw,
+            wrapped_lines=info["wrapped_lines"],
+            font=font,
+            final_box=info["final_box"],
+            dot_color=info["dot_color"]
+        )
+        # Draw dot on top
+        px, py = info["dot_x"], info["dot_y"]
         r = config.dot_radius
-        points_draw.ellipse((px - r - 1, pz - r - 1, px + r + 1, pz + r + 1), fill="white")
-        points_draw.ellipse((px - r, pz - r, px + r, pz + r), fill=dot_color)
+        labels_draw.ellipse((px - r, py - r, px + r, py + r), fill=info["dot_color"], outline="white", width=2)
 
     points_path = os.path.join(config.output_dir, f"{category}_points.png")
     labels_path = os.path.join(config.output_dir, f"{category}_labels.png")

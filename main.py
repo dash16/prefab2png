@@ -77,8 +77,15 @@ def parse_prefabs(xml_path, biome_img, config):
             excluded_names["excluded"].add(name)
             continue
 
+        sx = float(deco.attrib.get("size_x", "0"))
+        sz = float(deco.attrib.get("size_z", "0"))
+        
+        # Shift to center of prefab footprint
         x, _, z = map(float, pos.split(","))
-        px, pz = transform_coords(x, z)
+        center_x = x + sx / 2
+        center_z = z + sz / 2
+        
+        px, pz = transform_coords(center_x, center_z)
 
         # Determine category
         if name.startswith("playerstart") or name.startswith("player_start"):
@@ -114,20 +121,16 @@ if args.skip_layers:
 if not args.skip_layers:
     combined_path = None
     for category, points in categorized_points.items():
-        if args.only_biomes:
-            # Only render biome_* categories listed
-            if not category.startswith("biome_"):
-                continue
-            biome = category[len("biome_"):]
-            if biome not in args.only_biomes:
-                continue
-            # If --biomes not used, render everything
+        # Only render biome_* categories listed
         if args.only_biomes:
             if not category.startswith("biome_"):
                 continue
             biome = category[len("biome_"):]
             if biome not in args.only_biomes:
                 continue
+        # ✅ Skip player_starts unless explicitly enabled
+        if category == "player_starts" and not args.with_player_starts:
+            continue
 
         dot_centers = [(px, pz) for _, _, px, pz in points]
 
@@ -162,12 +165,18 @@ def render_legend(legend_entries, config):
     y_start = 20
     y = y_start
 
-    line_height = font.getbbox("Ag")[3] - font.getbbox("Ag")[1] + 6
+    line_height = font.getbbox("Ag")[3] - font.getbbox("Ag")[1] + 12
 
     # Zone boundaries
+    COL_WIDTH = 400  # max label width, adjustable
+    COL_SPACING = 20
+    
+    # Left zone: 2 columns
     LEFT_START_X = 20
-    LEFT_MAX_X = LEFT_START_X + 2 * 400
-    RIGHT_START_X = config.image_size[0] - 400
+    LEFT_MAX_X = LEFT_START_X + COL_WIDTH * 2 + COL_SPACING
+    
+    # Right zone: 2 columns
+    RIGHT_START_X = config.image_size[0] - COL_WIDTH * 2 - COL_SPACING
     RIGHT_MAX_X = config.image_size[0] - 20
 
     x = LEFT_START_X
@@ -185,12 +194,16 @@ def render_legend(legend_entries, config):
         for poi_id, label in legend_entries.items()
     ) + col_spacing
 
-    for poi_id, label in legend_entries.items():
+    for poi_id, (label, prefab_name) in legend_entries.items():
+        name_key = prefab_name.lower()
+        tier = prefab_tiers.get(name_key, -1)
+        dot_color = tier_colors.get(tier, "#FF0000")  # Default red for unknowns
+
         text = f"{poi_id} → {label}"
 
         if y + line_height > config.image_size[1] - 20:
             if zone == "left":
-                if x + col_width < LEFT_START_X + col_width * 2:
+                if x + col_width < LEFT_MAX_X:
                     x += col_width
                 else:
                     x = RIGHT_START_X
@@ -203,7 +216,19 @@ def render_legend(legend_entries, config):
                     break
             y = y_start
 
-        draw.text((x, y), text, fill="black", font=font)
+        # Measure text box
+        bbox = font.getbbox(text)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+        pad = 6
+        box = [x - pad, y - pad, x + text_w + pad, y + text_h + pad]
+        
+        # Draw background box
+        draw.rounded_rectangle(box, radius=6, fill=(255, 255, 255, 230), outline=dot_color, width=2)
+        
+        # Draw text on top
+        draw.text((x, y), text, fill=dot_color, font=font)
+
         y += line_height
         entries_drawn += 1
 

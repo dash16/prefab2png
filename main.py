@@ -21,8 +21,9 @@ def null_log(msg):
 
 def create_logger(verbose):
     if verbose:
-        os.makedirs('output', exist_ok=True)
-        log_file = open("output/green_zone_debug.txt", "w")
+        os.makedirs(config.output_dir, exist_ok=True)
+        log_file = open(os.path.join(config.log_dir, "green_zone_debug.txt"), "w")
+        log_file.write(f"# prefab2png version: {version}\n")
         def log(msg):
             log_file.write(msg + "\n")
             log_file.flush()
@@ -32,6 +33,12 @@ def create_logger(verbose):
 # === Setup ===
 config = Config(args)
 import datetime
+# Load version string from version.txt
+try:
+    with open("version.txt") as vf:
+        version = vf.read().strip()
+except FileNotFoundError:
+    version = "unknown"
 
 # === Build dynamic output folder name based on CLI flags ===
 flag_parts = []
@@ -50,8 +57,27 @@ if args.verbose:
 timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M")
 suffix = f"{''.join(flag_parts)}__{timestamp}" if flag_parts else timestamp
 
-config.output_dir = f"output--{suffix}"
+config.output_dir = f"output--{version}--{suffix}"
+config.combined_dir = os.path.join(config.output_dir, "combined")
 os.makedirs(config.output_dir, exist_ok=True)
+
+if args.verbose or args.log_missing:
+    config.log_dir = os.path.join(config.output_dir, "logs")
+    os.makedirs(config.log_dir, exist_ok=True)
+else:
+    config.log_dir = None  # Prevent accidental use
+
+if config.log_dir:
+    config.verbose_log = os.path.join(config.log_dir, "verbose_log.csv")
+    config.verbose_log_file = open(config.verbose_log, "w", encoding="utf-8")
+    config.verbose_log_file.write(f"# prefab2png version: {version}\n")
+    config.missing_log = os.path.join(config.log_dir, "missing_display_names.txt")
+    config.excluded_log = os.path.join(config.log_dir, "excluded_prefabs.txt")
+else:
+    config.verbose_log = None
+    config.verbose_log_file = None
+    config.missing_log = None
+    config.excluded_log = None
 
 display_names = load_display_names(config.localization_path)
 tier_colors, prefab_tiers = load_tiers()

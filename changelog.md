@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.5.5] - 2025-07-09
+
+### 🛠️ Internal Cleanup
+
+- Finalized centralization of all verbose-mode logs to `logs/` subdirectory
+- Fixed `AttributeError` from missing `verbose_log_file` after refactor
+- Log file initialization and version tagging now handled in `main.py`
+- Removed stale path assignments from `parse.py` that could lead to incorrect log locations
+- Added `prefab2png version` metadata line to `verbose_log.csv` for traceability
+
 ## [v0.5.4] - 2025-07-09
 
 ### 🐛 Fixed

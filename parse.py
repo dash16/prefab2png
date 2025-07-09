@@ -49,10 +49,6 @@ class Config:
 
         self.output_dir = "output"
         self.combined_dir = os.path.join(self.output_dir, "combined")
-        self.missing_log = os.path.join(self.output_dir, "missing_display_names.txt")
-        self.verbose_log = os.path.join(self.output_dir, "verbose_log.csv")
-        self.excluded_log = os.path.join(self.output_dir, "excluded_prefabs.txt")
-
         self.xml_path, self.localization_path, self.biome_path = self.resolve_paths()
         self.font_path = self.resolve_font_path()
         self.font = self.load_font()
@@ -60,10 +56,6 @@ class Config:
         os.makedirs(self.output_dir, exist_ok=True)
         if self.args.combined:
             os.makedirs(self.combined_dir, exist_ok=True)
-
-        self.verbose_log_file = open(self.verbose_log, "w", encoding="utf-8") if self.args.verbose else None
-        if self.verbose_log_file:
-            self.verbose_log_file.write("poi_id,prefab_name,display_name,dot_color,placement\n")
 
     def resolve_paths(self):
         if self.args.xml and self.args.localization and self.args.biomes:

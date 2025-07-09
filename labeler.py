@@ -1,7 +1,7 @@
 # labeler.py
 import os
 os.makedirs("output", exist_ok=True)
-green_zone_debug = open(os.path.join("output", "green_zone_debug.txt"), "w")
+# green_zone_debug = open(os.path.join("output", "green_zone_debug.txt"), "w")
 
 def boxes_overlap(box1, box2):
     """Return True if two filled rectangles overlap in any way, including touching."""

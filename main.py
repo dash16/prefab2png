@@ -31,6 +31,28 @@ def create_logger(verbose):
 
 # === Setup ===
 config = Config(args)
+import datetime
+
+# === Build dynamic output folder name based on CLI flags ===
+flag_parts = []
+
+if args.numbered_dots:
+    flag_parts.append("--numbered-dots")
+if args.no_mask:
+    flag_parts.append("--no-mask")
+if args.with_player_starts:
+    flag_parts.append("--with-player-starts")
+if args.combined:
+    flag_parts.append("--combined")
+if args.verbose:
+    flag_parts.append("--verbose")
+
+timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M")
+suffix = f"{''.join(flag_parts)}__{timestamp}" if flag_parts else timestamp
+
+config.output_dir = f"output--{suffix}"
+os.makedirs(config.output_dir, exist_ok=True)
+
 display_names = load_display_names(config.localization_path)
 tier_colors, prefab_tiers = load_tiers()
 biome_img = load_biome_image(config.biome_path, config.image_size)

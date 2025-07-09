@@ -170,6 +170,10 @@ def render_category_layer(
                 "dot_color": dot_color
             })
             occupied_boxes.append(final_box)
+            
+            if config.args.verbose and config.verbose_log_file:
+                tier_str = f" (Tier {tier})" if tier >= 0 else ""
+                config.verbose_log_file.write(f"{poi_id},{name},{display}{tier_str},{dot_color},rendered\n")
 
         elif result and category in ("player_starts", "streets"):
             line_height = font.getbbox("Ay")[3] - font.getbbox("Ay")[1]
@@ -282,10 +286,6 @@ def render_category_layer(
             final_box=info["final_box"],
             dot_color=info["dot_color"]
         )
-        # Draw dot on top
-        px, py = info["dot_x"], info["dot_y"]
-        r = config.dot_radius
-        labels_draw.ellipse((px - r, py - r, px + r, py + r), fill=info["dot_color"], outline="white", width=2)
 
     points_path = os.path.join(config.output_dir, f"{category}_points.png")
     labels_path = os.path.join(config.output_dir, f"{category}_labels.png")

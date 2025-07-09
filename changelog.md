@@ -1,5 +1,24 @@
 # Changelog
 
+## [v0.5.4] - 2025-07-09
+
+### 🐛 Fixed
+- **Wedge labels no longer render redundant POI dots** — the dot is now drawn only on the `_points.png` layer
+- **Green zone debug log file only generated when `--verbose` is enabled**, preventing empty file clutter
+- **All successfully placed wedge labels are now logged to `verbose_log.csv`**, not just fallbacks or special cases
+- **Output directory name is now dynamically constructed** based on CLI flags and timestamp  
+  (e.g., `output----no-mask--verbose__2025-07-09_1221`)
+
+### 📁 Output Directory Behavior
+- New folders are named based on flags used, preserving full CLI-style names
+- Example: `main.py --numbered-dots --no-mask` → `output----numbered-dots--no-mask__2025-07-09_1221`
+- Prior folders are untouched, making test comparisons easier
+
+### 📊 Logging Behavior
+- `verbose_log.csv` includes every POI with a successfully placed wedge label, restoring previous behavior
+- Skipped POIs and legend fallbacks remain logged as before
+- `player_starts` still receive special-case logging if included
+
 ## [v0.5.3] - 2025-07-08
 
 ### ✨ Added

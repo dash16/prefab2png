@@ -77,10 +77,33 @@ These files are part of the 7 Days to Die default installation, however you may 
 
 Default output directory: `output/`
 
+### Output Directory Naming
+
+The script now generates unique output folders automatically based on the CLI flags you use.
+
+Examples:
+- `main.py --no-mask` → `output--no-mask__2025-07-09_1030`
+- `main.py --numbered-dots --combined` → `output--numbered-dots--combined__2025-07-09_1115`
+
+This makes it easier to track test renders and compare variants.
+
 Contents:
 - `biome_forest_points.png`, etc. – Prefab dots per biome
 - `..._labels.png` – Label overlays
 - `combined/` – Optional combined PNG per category and all layers
+
+### 🔍 Verbose Logging Output
+
+When you run the script with the `--verbose` flag, additional debug files are written to the output directory:
+
+| File                         | Description |
+|------------------------------|-------------|
+| `verbose_log.csv`            | Logs every POI with its `POI_ID`, prefab name, display name, tier (if available), color, and placement status. Includes both rendered and skipped labels. Useful for reviewing what was drawn and why. |
+| `green_zone_debug.txt`       | Diagnostics related to green zone label placement. Shows attempted positions and rejection reasons. Helpful for troubleshooting why a label was placed far from a dot or skipped entirely. Only generated if `--verbose` is used. |
+| `excluded_prefabs.txt`       | Logs any prefabs filtered out by name/category logic, useful for debugging exclusions. |
+| `missing_display_names.txt`  | *(optional)* List of prefab names that had no corresponding display name in `Localization.txt`. Generated if `--log-missing` is enabled. |
+
+These logs can be used to analyze placement behavior, inspect rejected POIs, or verify that difficulty tiers and display names are correctly applied.
 
 ---
 

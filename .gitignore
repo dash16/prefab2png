@@ -3,8 +3,8 @@
 
 # Project files
 prefab2pngdev.py
-output/
---no-mask output/
+output*/
+heatmap/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

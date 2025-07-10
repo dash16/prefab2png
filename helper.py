@@ -105,3 +105,52 @@ def try_green_zone_label(text, base_x, base_y, font, mask, occupied_boxes, red_r
             return lx, ly, label_box
 
     return None  # Fallback: draw directly on dot
+# ----------------------------------------------
+# ✅ Prefab XML loader
+# ----------------------------------------------
+
+import xml.etree.ElementTree as ET
+
+def load_prefabs_from_xml(xml_path):
+    """
+    Parses prefabs.xml and returns a list of (POI_ID, name, x, z) tuples.
+    Supports prefabs defined using position="x,y,z" attribute.
+    """
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+    prefabs = []
+    i = 0
+    for elem in root.iter():
+        name = elem.get("name")
+        position = elem.get("position")
+        if not name or not position:
+            continue
+        try:
+            x, y, z = map(float, position.split(","))
+            i += 1
+            prefabs.append((f"POI_{i}", name, int(x), int(z)))
+        except ValueError:
+            continue
+    print(f"✅ Found {len(prefabs)} prefab entries.")
+    return prefabs
+
+# ----------------------------------------------
+# ✅ Prefab filter
+# ----------------------------------------------
+
+def should_exclude(name):
+    if not name:
+        return True
+    name = name.lower()
+    if name.startswith(("bridge", "wilderness_filler", "part_", "street_light", "diersville_city_sign", "cornfield_", "site_grave", "rwg_tile_")):
+        return True
+    if name.startswith("sign_") and not (name.startswith("sign_260") or name.startswith("sign_73")):
+        return True
+    return False
+# ----------------------------------------------
+# ✅ Normalize coordinates
+# ----------------------------------------------    
+def transform_coords(x, z, map_center=3072):
+    cx = int(x + map_center if x >= 0 else map_center - abs(x))
+    cz = int(map_center - z if z >= 0 else map_center + abs(z))
+    return cx, cz

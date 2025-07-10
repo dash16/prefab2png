@@ -7,7 +7,8 @@ from labeler import (
     wrap_label,
     get_text_box,
     is_placeable,
-    find_label_position_in_blue_zone
+    find_label_position_in_blue_zone,
+    placed_bounding_boxes
 )
 
 
@@ -170,6 +171,7 @@ def render_category_layer(
                 "dot_color": dot_color
             })
             occupied_boxes.append(final_box)
+            placed_bounding_boxes.append((poi_id, category, final_box))
             
             if config.args.verbose and config.verbose_log_file:
                 tier_str = f" (Tier {tier})" if tier >= 0 else ""

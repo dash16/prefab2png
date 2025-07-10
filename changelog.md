@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased] - prefab2png v0.6
+
+### ✨ Added
+- **Bounding box tracker** for every successfully placed label
+  - Captures POI ID, layer, and bounding box dimensions
+  - Outputs to `output/bounding_boxes.csv` after render
+- New red zone awareness groundwork:
+  - Future label placements can avoid overlap using this data
+  - Enables automatic `mask.gif` generation without heatmap
+- Label exclusions:
+  - `player_starts` and `streets` no longer influence green zone logic or collision checks
+
+### 🧰 Internal
+- `labeler.py`: tracks and exposes `placed_bounding_boxes`
+- `render.py`: appends bounding box data for successful placements
+- `main.py`: handles CSV export at end of render
+
 ## [v0.5.5] - 2025-07-09
 
 ### 🛠️ Internal Cleanup

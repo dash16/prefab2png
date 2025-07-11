@@ -1,5 +1,6 @@
 # labeler.py
 import os
+placed_bounding_boxes = [] # Global list of placed bounding boxes: (poi_id, layer, (x1, y1, x2, y2))
 
 def boxes_overlap(box1, box2):
     """Return True if two filled rectangles overlap in any way, including touching."""

@@ -2,9 +2,9 @@
 .DS_Store
 
 # Project files
-prefab2pngdev.py
 output*/
 heatmap/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

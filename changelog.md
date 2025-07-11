@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.6 – "Legendary"
+**Release Date:** 2025-07-10
+
+### ✨ New Features
+- Updated visuals on Legend, added title, shaded bounding box that snaps to the labels written
+- Automatic legend layout with 4-column support and overflow handling
+- All log files now include the version number inline
+- Output folder names now include all relevant flags (`--no-mask`, `--skip-layers`, etc.)
+- Render time displayed at end of run (`🕒 Render completed in X.XX seconds`)
+- `Config` class moved into `helper.py` for clean modular CLI parsing
+
+### ✅ Bug Fixes
+- Fixed `output/` folder duplication due to hardcoded path
+- Fixed `--skip-layers` logic and output naming
+- Fixed legend entries overlapping the `"Legend"` title
+
+### 🛠 Improvements
+- `bounding_boxes.csv` and `excluded_prefabs.txt` now include version headers
+- Legend entries are sorted by POI_ID for better readability
+
+### ✨ Added
+- **Bounding box tracker** for every successfully placed label
+  - Captures POI ID, layer, and bounding box dimensions
+  - Outputs to `output/bounding_boxes.csv` after render
+- New red zone awareness groundwork:
+  - Future label placements can avoid overlap using this data
+  - Enables automatic `mask.gif` generation without heatmap
+- Label exclusions:
+  - `player_starts` and `streets` no longer influence green zone logic or collision checks
+
+### 🧰 Internal
+- `labeler.py`: tracks and exposes `placed_bounding_boxes`
+- `render.py`: appends bounding box data for successful placements
+- `main.py`: handles CSV export at end of render
+
 ## [v0.5.5] - 2025-07-09
 
 ### 🛠️ Internal Cleanup

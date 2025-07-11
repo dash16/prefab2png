@@ -14,6 +14,87 @@
 # - Optional: auto-generation of red/blue zones based on POI clustering (v0.6+)
 
 from PIL import ImageFont
+import os
+import datetime
+import platform
+
+# === CONFIGURATION ===
+class Config:
+    def __init__(self, args):
+        self.args = args
+        self.image_size = (6145, 6145)
+        self.map_center = 3072
+        self.dot_radius = 4
+        self.font_size = 20
+        self.label_padding = 4
+
+        self.output_dir = None
+        self.combined_dir = None
+        self.log_dir = None
+        self.xml_path, self.localization_path, self.biome_path = self.resolve_paths()
+        self.font_path = self.resolve_font_path()
+        self.font = self.load_font()
+
+        self.verbose_log = None
+        self.verbose_log_file = None
+        self.missing_log = None
+        self.excluded_log = None
+        
+    def resolve_paths(self):
+        if self.args.xml and self.args.localization and self.args.biomes:
+            return self.args.xml, self.args.localization, self.args.biomes
+        elif platform.system() == "Windows":
+            return (
+                os.path.expandvars(r"%ProgramFiles(x86)%\Steam\steamapps\common\7 Days To Die\Data\Worlds\Navezgane\prefabs.xml"),
+                os.path.expandvars(r"%ProgramFiles(x86)%\Steam\steamapps\common\7 Days To Die\Data\Config\Localization.txt"),
+                os.path.expandvars(r"%ProgramFiles(x86)%\Steam\steamapps\common\7 Days To Die\Data\Worlds\Navezgane\biomes.png")
+            )
+        else:
+            base = "~/Library/Application Support/Steam/steamapps/common/7 Days To Die/7DaysToDie.app/Data"
+            return (
+                os.path.expanduser(f"{base}/Worlds/Navezgane/prefabs.xml"),
+                os.path.expanduser(f"{base}/Config/Localization.txt"),
+                os.path.expanduser(f"{base}/Worlds/Navezgane/biomes.png")
+            )
+
+    def resolve_font_path(self):
+        return "C:\\Windows\\Fonts\\arial.ttf" if platform.system() == "Windows" else "/System/Library/Fonts/Supplemental/Arial.ttf"
+
+    def load_font(self):
+        try:
+            return ImageFont.truetype(self.font_path, self.font_size)
+        except OSError:
+            return ImageFont.load_default()
+
+# === ARGUMENT PARSING ===
+import argparse
+parser = argparse.ArgumentParser(description="Render 7DTD prefab map layers.")
+parser.add_argument("--xml", type=str, help="Full path to prefabs.xml")
+parser.add_argument("--localization", type=str, help="Full path to Localization.txt")
+parser.add_argument("--biomes", type=str, help="Full path to biomes.png")
+parser.add_argument("--verbose", action="store_true", help="Enable verbose prefab name and tier logging.")
+parser.add_argument("--combined", action="store_true", help="Generate combined PNG layers.")
+parser.add_argument("--with-player-starts", action="store_true", help="Include 'player_starts' layer.")
+parser.add_argument("--log-missing", action="store_true", help="Log prefabs missing display names.")
+parser.add_argument("--numbered-dots", action="store_true", help="Replace prefab dots with unique POI IDs.")
+parser.add_argument("--skip-layers", action="store_true", help="Skip rendering prefab layers and go directly to legend rendering.")
+parser.add_argument("--no-mask", action="store_true", help="Disable mask-based red/blue zone logic")
+parser.add_argument("--only-biomes", nargs="+", metavar="BIOME", help="Only render the specified biome layers. Options: pine_forest, desert, snow, burnt_forest, wasteland."
+)
+
+# Validate arguments input early
+# only-biomes
+valid_biomes = {"pine_forest", "desert", "snow", "burnt_forest", "wasteland"}
+
+args = parser.parse_args()
+
+if args.only_biomes:
+    invalid = set(args.only_biomes) - valid_biomes
+    if invalid:
+        parser.error(
+            f"Invalid biome name(s): {', '.join(invalid)}\n"
+            f"Valid options: {', '.join(sorted(valid_biomes))}"
+        )
 
 # ----------------------------------------------
 # ✅ Bounding box + overlap logic

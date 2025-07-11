@@ -1,6 +1,24 @@
 # Changelog
 
-## [Unreleased] - prefab2png v0.6
+## v0.6 – "Legendary"
+**Release Date:** 2025-07-10
+
+### ✨ New Features
+- Updated visuals on Legend, added title, shaded bounding box that snaps to the labels written
+- Automatic legend layout with 4-column support and overflow handling
+- All log files now include the version number inline
+- Output folder names now include all relevant flags (`--no-mask`, `--skip-layers`, etc.)
+- Render time displayed at end of run (`🕒 Render completed in X.XX seconds`)
+- `Config` class moved into `helper.py` for clean modular CLI parsing
+
+### ✅ Bug Fixes
+- Fixed `output/` folder duplication due to hardcoded path
+- Fixed `--skip-layers` logic and output naming
+- Fixed legend entries overlapping the `"Legend"` title
+
+### 🛠 Improvements
+- `bounding_boxes.csv` and `excluded_prefabs.txt` now include version headers
+- Legend entries are sorted by POI_ID for better readability
 
 ### ✨ Added
 - **Bounding box tracker** for every successfully placed label

@@ -1,6 +1,7 @@
 # main.py
 
-from parse import args, Config, load_display_names, load_tiers, load_biome_image, extract_blue_zones
+from helper import Config, args
+from parse import load_display_names, load_tiers, load_biome_image, extract_blue_zones
 from filters import should_exclude
 from render import render_category_layer
 from labeler import (is_placeable, placed_bounding_boxes)
@@ -8,6 +9,8 @@ import os
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from PIL import Image
+import time
+import datetime
 
 LABEL_MASK_PATH = "mask.gif"
 LABEL_MASK_RED = (165, 27, 27)
@@ -32,7 +35,7 @@ def create_logger(verbose):
 
 # === Setup ===
 config = Config(args)
-import datetime
+start_time = time.time()
 # Load version string from version.txt
 try:
     with open("version.txt") as vf:
@@ -51,6 +54,8 @@ if args.with_player_starts:
     flag_parts.append("--with-player-starts")
 if args.combined:
     flag_parts.append("--combined")
+if args.skip_layers:
+    flag_parts.append("--skip-layers")
 if args.verbose:
     flag_parts.append("--verbose")
 
@@ -60,6 +65,9 @@ suffix = f"{''.join(flag_parts)}__{timestamp}" if flag_parts else timestamp
 config.output_dir = f"output--{version}--{suffix}"
 config.combined_dir = os.path.join(config.output_dir, "combined")
 os.makedirs(config.output_dir, exist_ok=True)
+
+if config.args.combined:
+    os.makedirs(config.combined_dir, exist_ok=True)
 
 if args.verbose or args.log_missing:
     config.log_dir = os.path.join(config.output_dir, "logs")
@@ -164,7 +172,8 @@ categorized_points, excluded_names, missing_names = parse_prefabs(config.xml_pat
 layer_files = []
 legend_entries = {}
 if args.skip_layers:
-    legend_entries["P0000"] = "DEBUG TEST POI"
+    if args.skip_layers:
+        legend_entries["P0000"] = ("DEBUG TEST POI", "debug_test_poi")
 
 if not args.skip_layers:
     combined_path = None
@@ -210,7 +219,7 @@ def render_legend(legend_entries, config):
     img = Image.new("RGBA", config.image_size, (255, 255, 255, 0))
     draw = ImageDraw.Draw(img)
 
-    y_start = 20
+    y_start = 48
     y = y_start
 
     line_height = font.getbbox("Ag")[3] - font.getbbox("Ag")[1] + 12
@@ -231,10 +240,6 @@ def render_legend(legend_entries, config):
     zone = "left"
     entries_drawn = 0
 
-    # Background shading
-    draw.rectangle([(0, 0), (LEFT_MAX_X, config.image_size[1])], fill="#F0F0F0")
-    draw.rectangle([(RIGHT_START_X, 0), (RIGHT_MAX_X, config.image_size[1])], fill="#F0F0F0")
-
     # Calculate dynamic column width
     col_spacing = 40
     col_width = max(
@@ -242,7 +247,9 @@ def render_legend(legend_entries, config):
         for poi_id, label in legend_entries.items()
     ) + col_spacing
 
-    for poi_id, (label, prefab_name) in legend_entries.items():
+    drawn_boxes = []
+    drawn_entries = []
+    for poi_id, (label, prefab_name) in sorted(legend_entries.items()):
         name_key = prefab_name.lower()
         tier = prefab_tiers.get(name_key, -1)
         dot_color = tier_colors.get(tier, "#FF0000")  # Default red for unknowns
@@ -270,15 +277,29 @@ def render_legend(legend_entries, config):
         text_h = bbox[3] - bbox[1]
         pad = 6
         box = [x - pad, y - pad, x + text_w + pad, y + text_h + pad]
-        
-        # Draw background box
-        draw.rounded_rectangle(box, radius=6, fill=(255, 255, 255, 230), outline=dot_color, width=2)
-        
+                
         # Draw text on top
         draw.text((x, y), text, fill=dot_color, font=font)
-
+        drawn_boxes.append((box[0], box[1], box[2], box[3]))
+        drawn_entries.append((text, tuple(box), dot_color, (x, y)))
         y += line_height
         entries_drawn += 1
+       
+    # Draw background and title box
+    if drawn_boxes:
+        pad = 8
+        min_x = max(0, min(box[0] for box in drawn_boxes) - pad)
+        min_y = max(0, min(box[1] for box in drawn_boxes) - pad - 24)  # space for title
+        max_x = min(config.image_size[0], max(box[2] for box in drawn_boxes) + pad)
+        max_y = min(config.image_size[1], max(box[3] for box in drawn_boxes) + pad)
+
+        draw.rectangle([(min_x, min_y), (max_x, max_y)], fill=(0, 0, 0, 192))
+        draw.text((min_x + 6, min_y + 4), "Legend", font=font, fill="white")
+
+    # Redraw each entry now that background is down
+    for text, box, dot_color, (x, y) in drawn_entries:
+        draw.rounded_rectangle(box, radius=6, fill=(255, 255, 255, 230), outline=dot_color, width=2)
+        draw.text((x, y), text, fill=dot_color, font=font)
 
     print(f"✅ Legend rendered: {entries_drawn} entries")
     legend_path = os.path.join(config.output_dir, "poi_legend.png")
@@ -309,15 +330,18 @@ if args.log_missing and missing_names:
 
 if args.verbose and excluded_names:
     with open(config.excluded_log, "w", encoding="utf-8") as f:
+        f.write(f"# prefab2png version: {version}\n")
         for cat, names in excluded_names.items():
             for name in sorted(names):
                 f.write(f"{cat},{name}\n")
     print(f"📝 Excluded prefab names: {config.excluded_log}")
 
-with open(os.path.join(config.output_dir, "bounding_boxes.csv"), "w", encoding="utf-8") as f:
+with open(os.path.join(config.log_dir or config.output_dir, "bounding_boxes.csv"), "w", encoding="utf-8") as f:
+    f.write(f"# prefab2png version: {version}\n")
     f.write("poi_id,layer,x1,y1,x2,y2\n")
     for poi_id, layer, (x1, y1, x2, y2) in placed_bounding_boxes:
         f.write(f"{poi_id},{layer},{x1},{y1},{x2},{y2}\n")
 
 if config.verbose_log_file:
     config.verbose_log_file.close()
+print(f"🕒 Render completed in {time.time() - start_time:.2f} seconds")    

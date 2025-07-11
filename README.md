@@ -8,7 +8,7 @@
 
 This Python script renders layered map images from game files used by the game **7 Days to Die**. It creates layers of labeled points of interest (POIs) using in-game data, suitable for editing or display.
 
-**Version:** 0.5.5
+**Version:** 0.6
 **Author:** Dustin Newell  
 **License:** AGPL-3.0
 
@@ -23,6 +23,13 @@ Prefab POIs with in-game names are included. Decorations, filler assets, and unn
 Prefab difficulty tiers (0–5) are color-coded based on an optional `diff.csv` file.
 
 ---
+
+## New in v0.6
+- 🎨 Improved POI legend with tier-based color coding
+- 🧱 Cleaner CLI and dynamic output folders
+- 📄 Logs now include prefab2png version info
+- 🚀 Renders now complete in ~10 seconds with better placement logic
+
 
 ## 🔧 Features
 

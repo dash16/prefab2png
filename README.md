@@ -8,7 +8,7 @@
 
 This Python script renders layered map images from game files used by the game **7 Days to Die**. It creates layers of labeled points of interest (POIs) using in-game data, suitable for editing or display.
 
-**Version:** 0.6
+**Version:** v0.6.1
 **Author:** Dustin Newell  
 **License:** AGPL-3.0
 
@@ -40,8 +40,8 @@ Prefab difficulty tiers (0–5) are color-coded based on an optional `diff.csv` 
 - 📍 Text labels showing Display Names for each prefab, with overlap avoidance and connector lines
   - 🧼 Legend only shows skipped labels (not all POIs)
 - 🧹 Prefab filtering with built-in exclusions and biome categorization
-- ✍️ Smart label placement with blue zone targeting
-  - Smart green zone placement with vertical, horizontal, and diagonal fallback
+- ✍️ Smart green zone placement with vertical, horizontal, and diagonal fallback (default)
+  - Smart label placement with red zone prohibition, blue zone targeting with green zone > legend fallback(--mask CLI flag)
 - 🔎 Verbose logging and display name fallback
 - 📍Unique `POI_ID` markers rendered on the map (optional via `--numbered-dots`)
 - 📁 Output directory includes points, labels, and optionally combined layers
@@ -103,11 +103,11 @@ Contents:
 
 When you run the script with the `--verbose` flag, additional debug files are written to the output directory:
 
-| File                         | Description |
+| File						   | Description |
 |------------------------------|-------------|
-| `verbose_log.csv`            | Logs every POI with its `POI_ID`, prefab name, display name, tier (if available), color, and placement status. Includes both rendered and skipped labels. Useful for reviewing what was drawn and why. |
-| `green_zone_debug.txt`       | Diagnostics related to green zone label placement. Shows attempted positions and rejection reasons. Helpful for troubleshooting why a label was placed far from a dot or skipped entirely. Only generated if `--verbose` is used. |
-| `excluded_prefabs.txt`       | Logs any prefabs filtered out by name/category logic, useful for debugging exclusions. |
+| `verbose_log.csv`			   | Logs every POI with its `POI_ID`, prefab name, display name, tier (if available), color, and placement status. Includes both rendered and skipped labels. Useful for reviewing what was drawn and why. |
+| `green_zone_debug.txt`	   | Diagnostics related to green zone label placement. Shows attempted positions and rejection reasons. Helpful for troubleshooting why a label was placed far from a dot or skipped entirely. Only generated if `--verbose` is used. |
+| `excluded_prefabs.txt`	   | Logs any prefabs filtered out by name/category logic, useful for debugging exclusions. |
 | `missing_display_names.txt`  | *(optional)* List of prefab names that had no corresponding display name in `Localization.txt`. Generated if `--log-missing` is enabled. |
 
 These logs can be used to analyze placement behavior, inspect rejected POIs, or verify that difficulty tiers and display names are correctly applied.
@@ -122,7 +122,7 @@ See [changelog.md](changelog.md) for version history and notes.
 
 ## License
 
-This project is licensed under the [GNU AGPL v3](LICENSE).  It is not affiliated with or endorsed by The Fun Pimps.
+This project is licensed under the [GNU AGPL v3](LICENSE).	It is not affiliated with or endorsed by The Fun Pimps.
 
 ---
 

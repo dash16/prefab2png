@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.6.1] - Green for launch
+**Release Date:** 2025-07-12
+### Added
+- New `--mask` CLI flag to enable red/blue label zone logic.
+
+### Changed
+- Green zone logic is now default (formerly behind `--no-mask`).
+- Red zone behavior only triggers when `--mask` is set.
+
+### Fixed
+- POI_ID fallback rendering now matches green zone logic.
+- Bounding box debug CSV output is now optional (can be commented out cleanly).
+
+### Deferred
+- Wedge label styling (bubble/pin)
+- Legend code refactor
+- Bounding box visualizer
+
 ## v0.6 – "Legendary"
 **Release Date:** 2025-07-10
 
@@ -51,7 +69,7 @@
 - **Wedge labels no longer render redundant POI dots** — the dot is now drawn only on the `_points.png` layer
 - **Green zone debug log file only generated when `--verbose` is enabled**, preventing empty file clutter
 - **All successfully placed wedge labels are now logged to `verbose_log.csv`**, not just fallbacks or special cases
-- **Output directory name is now dynamically constructed** based on CLI flags and timestamp  
+- **Output directory name is now dynamically constructed** based on CLI flags and timestamp	 
   (e.g., `output----no-mask--verbose__2025-07-09_1221`)
 
 ### 📁 Output Directory Behavior
@@ -179,7 +197,7 @@
   Every prefab now receives a unique ID (e.g. `P0123`) which is rendered directly on the map when `--numbered-dots` is used. IDs also appear in verbose logging to aid reference and analysis.
 - 🧾 **Map-Based POI Legend**  
   A legend panel is dynamically rendered on the map's unused margins (left + right) showing every `POI_ID → Display Name` mapping. Automatically activated with `--numbered-dots`.
-- 🔎 **Better Label Placement (v3-style fallback)**  
+- 🔎 **Better Label Placement (v3-style fallback)**	 
   Label collision detection now spirals outward to find open space before falling back to the default position. Cleaner labeling in dense prefab clusters.
 
 ## v0.4

@@ -24,21 +24,21 @@ overlay = Image.new("RGB", (image_width, image_height), "black")
 ol_draw = ImageDraw.Draw(overlay)
 
 try:
-    font = ImageFont.truetype("DejaVuSans.ttf", 20)
+	font = ImageFont.truetype("DejaVuSans.ttf", 20)
 except:
-    font = ImageFont.load_default()
+	font = ImageFont.load_default()
 
 for poi_id, name, x, z in prefabs:
-    px, pz = transform_coords(x, z)
-    current = heatmap.getpixel((px, pz))
-    for dx in range(-30, 31):
-        for dz in range(-30, 31):
-            tx, tz = px + dx, pz + dz
-            if 0 <= tx < image_width and 0 <= tz < image_height:
-                current = heatmap.getpixel((tx, tz))
-                heatmap.putpixel((tx, tz), min(255, current + 20))
-    ol_draw.rectangle((px - 2, pz - 2, px + 2, pz + 2), fill="white")
-    ol_draw.text((px + 4, pz - 4), poi_id, fill="white", font=font, stroke_width=1, stroke_fill="black")
+	px, pz = transform_coords(x, z)
+	current = heatmap.getpixel((px, pz))
+	for dx in range(-30, 31):
+		for dz in range(-30, 31):
+			tx, tz = px + dx, pz + dz
+			if 0 <= tx < image_width and 0 <= tz < image_height:
+				current = heatmap.getpixel((tx, tz))
+				heatmap.putpixel((tx, tz), min(255, current + 20))
+	ol_draw.rectangle((px - 2, pz - 2, px + 2, pz + 2), fill="white")
+	ol_draw.text((px + 4, pz - 4), poi_id, fill="white", font=font, stroke_width=1, stroke_fill="black")
 
 # === Save ===
 os.makedirs(output_dir, exist_ok=True)

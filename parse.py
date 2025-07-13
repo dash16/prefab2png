@@ -26,31 +26,17 @@ def load_display_names(path):
 	return display_names
 
 # === DIFFICULTY TIER COLORS ===
-def load_tiers(path="diff.csv"):
+### 🧩 Tier Color Map: Defines hex colors for difficulty tiers 0–5 (used for dots and label text)
+def load_tiers():
 	tier_colors = {
-		0: "#99896B",
+		0: "#99896B",  # Tier 0
 		1: "#C4833D",
 		2: "#A2A43A",
 		3: "#69BF4B",
 		4: "#3C5CC7",
 		5: "#9734C5"
 	}
-	tiers = {}
-	if os.path.exists(path):
-		with open(path, encoding="utf-8-sig") as f:
-			reader = csv.DictReader(f)
-			for row in reader:
-				name = row["prefabName"].strip().lower()
-				try:
-					tier = int(float(row["Tier"]))
-					if 0 <= tier <= 5:
-						tiers[name] = tier
-				except (ValueError, KeyError):
-					continue
-		print(f"✅ Loaded {len(tiers)} prefab difficulty ratings from {path}")
-	else:
-		print("⚠️ diff.csv not found.")
-	return tier_colors, tiers
+	return tier_colors
 
 # === BIOME HANDLING ===
 Biome = namedtuple("Biome", ["name", "rgb"])
@@ -61,7 +47,6 @@ canonical_biomes = [
 	Biome("burnt_forest", (190, 14, 246)),
 	Biome("snow", (255, 255, 255)),
 ]
-
 def rgb_distance(c1, c2):
 	return math.sqrt(sum((a - b) ** 2 for a, b in zip(c1, c2)))
 
@@ -111,6 +96,44 @@ def extract_blue_zones(mask_img, blue_rgb=(0, 42, 118)):
 				blue_zones.append(flood_fill(x, y))
 
 	return blue_zones
+
+### 🧩 Prefab Metadata Loader: Loads size and difficulty for prefab2png center shift and tier coloring
+def load_prefab_metadata(prefab_dir):
+	"""
+	Scans all .xml prefab files in the given directory and extracts:
+	- size_x, size_z from PrefabSize
+	- difficulty from DifficultyTier
+	Returns: dict[prefab_name] = (size_x, size_z, difficulty)
+	"""
+	import os
+	import xml.etree.ElementTree as ET
+
+	prefab_data = {}
+
+	for root, _, files in os.walk(prefab_dir):
+		for file in files:
+			if file.endswith(".xml"):
+				prefab_name = os.path.splitext(file)[0].lower()
+				xml_path = os.path.join(root, file)
+				try:
+					tree = ET.parse(xml_path)
+					props = {
+						p.attrib["name"].lower(): p.attrib["value"]
+						for p in tree.findall(".//property")
+						if "name" in p.attrib and "value" in p.attrib
+					}
+					size_x, size_z = 0, 0
+					if "prefabsize" in props:
+						parts = [s.strip() for s in props["prefabsize"].split(",")]
+						if len(parts) >= 3:
+							size_x = int(parts[0])
+							size_z = int(parts[2])
+					difficulty = int(props.get("difficultytier", -1))
+					prefab_data[prefab_name] = (size_x, size_z, difficulty)
+				except Exception as e:
+					print(f"⚠️ Failed to parse {file}: {e}")
+	return prefab_data
+
 
 # Extract dot centers from each category for collision/density use
 def determine_category(name, px, pz, biome_img):

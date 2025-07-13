@@ -99,7 +99,7 @@ def render_category_layer(
 	print(f"Rendering layer '{category}' with {len(points)} points...")
 	dot_centers = [(px, pz) for _, _, px, pz in points]
 	from labeler import find_label_position_near_dot, find_label_position_in_blue_zone
-
+	result = False
 	points_img = Image.new("RGBA", config.image_size, (255, 255, 255, 0))
 	labels_img = Image.new("RGBA", config.image_size, (255, 255, 255, 0))
 	points_draw = ImageDraw.Draw(points_img)
@@ -109,10 +109,10 @@ def render_category_layer(
 	occupied_boxes = []
 	label_infos = []
 	rejection_attempts = 0
-	if numbered_dots and not result:
+	if numbered_dots:
 		for poi_id, name, px, pz in points:
 			display = display_names.get(name, name)
-			legend_entries[poi_id] = (display_names.get(name, name), name)
+			legend_entries.append((poi_id, name, display_names.get(name, name)))
 
 			bbox = font.getbbox(poi_id)
 			text_w = bbox[2] - bbox[0]
@@ -131,6 +131,7 @@ def render_category_layer(
 		if points:
 			labels_img.save(labels_path)
 		return None, 0	  
+
 	for poi_id, name, px, pz in points:
 		display = display_names.get(name, name)
 		tier = tiers.get(name, -1)
@@ -241,7 +242,7 @@ def render_category_layer(
 				continue
 		
 			# ⬇️ Final fallback only if Pass 4 also fails
-			legend_entries[poi_id] = (display_names.get(name, name), name)
+			legend_entries.append((poi_id, name, display_names.get(name, name)))
 			bbox = labels_draw.textbbox((0, 0), poi_id, font=font)
 			w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
 			pad = 4
@@ -264,7 +265,7 @@ def render_category_layer(
 
 		# 🔢 If numbered-dots mode is enabled, draw POI_ID box too
 		if numbered_dots:
-			legend_entries[poi_id] = (display_names.get(name, name), name)
+			legend_entries.append((poi_id, name, display_names.get(name, name)))
 			bbox = font.getbbox(poi_id)
 			text_w = bbox[2] - bbox[0]
 			text_h = bbox[3] - bbox[1]
@@ -297,7 +298,6 @@ def render_category_layer(
 			final_box=info["final_box"],
 			dot_color="yellow" if info.get("pass4_debug") else info["dot_color"]
 		)
-
 	points_path = os.path.join(config.output_dir, f"{category}_points.png")
 	labels_path = os.path.join(config.output_dir, f"{category}_labels.png")
 	points_img.save(points_path)

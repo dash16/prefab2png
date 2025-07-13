@@ -32,13 +32,13 @@ class Config:
 		self.image_size = (6145, 6145)
 		self.map_center = 3072
 		self.dot_radius = 4
-		self.font_size = 20
+		self.font_size = args.text_size
 		self.label_padding = 4
 
 		self.output_dir = None
 		self.combined_dir = None
 		self.log_dir = None
-		self.xml_path, self.localization_path, self.biome_path = self.resolve_paths()
+		self.xml_path, self.localization_path, self.biome_path, self.prefab_dir = self.resolve_paths()
 		self.font_path = self.resolve_font_path()
 		self.font = self.load_font()
 
@@ -49,20 +49,24 @@ class Config:
 		self.debug_extended = self.args.extended_placement_debug
 		
 	def resolve_paths(self):
-		if self.args.xml and self.args.localization and self.args.biomes:
-			return self.args.xml, self.args.localization, self.args.biomes
+		if self.args.xml and self.args.localization and self.args.biomes and self.args.prefab_dir:
+			return self.args.xml, self.args.localization, self.args.biomes, self.args.prefab_dir
+	
 		elif platform.system() == "Windows":
+			base = os.path.expandvars(r"%ProgramFiles(x86)%\Steam\steamapps\common\7 Days To Die")
 			return (
-				os.path.expandvars(r"%ProgramFiles(x86)%\Steam\steamapps\common\7 Days To Die\Data\Worlds\Navezgane\prefabs.xml"),
-				os.path.expandvars(r"%ProgramFiles(x86)%\Steam\steamapps\common\7 Days To Die\Data\Config\Localization.txt"),
-				os.path.expandvars(r"%ProgramFiles(x86)%\Steam\steamapps\common\7 Days To Die\Data\Worlds\Navezgane\biomes.png")
+				os.path.join(base, "Data/Worlds/Navezgane/prefabs.xml"),
+				os.path.join(base, "Data/Config/Localization.txt"),
+				os.path.join(base, "Data/Worlds/Navezgane/biomes.png"),
+				os.path.join(base, "Data/Prefabs")
 			)
 		else:
-			base = "~/Library/Application Support/Steam/steamapps/common/7 Days To Die/7DaysToDie.app/Data"
+			base = os.path.expanduser("~/Library/Application Support/Steam/steamapps/common/7 Days To Die/7DaysToDie.app/Data")
 			return (
-				os.path.expanduser(f"{base}/Worlds/Navezgane/prefabs.xml"),
-				os.path.expanduser(f"{base}/Config/Localization.txt"),
-				os.path.expanduser(f"{base}/Worlds/Navezgane/biomes.png")
+				os.path.join(base, "Worlds/Navezgane/prefabs.xml"),
+				os.path.join(base, "Config/Localization.txt"),
+				os.path.join(base, "Worlds/Navezgane/biomes.png"),
+				os.path.join(base, "Prefabs")
 			)
 
 	def resolve_font_path(self):
@@ -74,7 +78,7 @@ class Config:
 		except OSError:
 			return ImageFont.load_default()
 
-# === ARGUMENT PARSING ===
+# === CLI ARGUMENTS ===
 import argparse
 parser = argparse.ArgumentParser(description="Render 7DTD prefab map layers.")
 parser.add_argument(
@@ -91,6 +95,11 @@ parser.add_argument(
 	"--biomes",
 	type=str,
 	help="Full path to 'biomes.png'"
+)
+parser.add_argument(
+	"--prefab-dir",
+	type=str,
+	help="Full path to the prefab directory containing individual .xml files with prefab metadata (size, difficulty, etc)."
 )
 parser.add_argument(
 	"--verbose",
@@ -144,9 +153,12 @@ parser.add_argument(
 	action="store_true",
 	help="Highlight labels placed during extended placement (Pass 4)"
 )
-
-
-
+parser.add_argument(
+	"--text-size",
+	type=int,
+	default=25,
+	help="Font size for POI labels. Default is 25. Max is 60."
+)
 
 # ----------------------------------------------
 # ✅ CLI arg validation
@@ -165,6 +177,11 @@ for path_arg, label in [(args.xml, "XML"), (args.localization, "Localization"), 
 	if path_arg and not os.path.isfile(path_arg):
 		parser.error(f"{label} file not found: {path_arg}")
 
+# --text-size
+if args.text_size > 60:
+	args.text_size = 60
+elif args.text_size < 10:
+	args.text_size = 10
 # ----------------------------------------------
 # ✅ Bounding box + overlap logic
 # ----------------------------------------------

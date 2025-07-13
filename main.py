@@ -63,6 +63,9 @@ if args.log_missing:
 if args.only_biomes:
 	flag_parts.append("--only-biomes")
 
+from parse import load_prefab_metadata
+prefab_info = load_prefab_metadata(config.prefab_dir)
+
 timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M")
 suffix = f"{''.join(flag_parts)}__{timestamp}" if flag_parts else timestamp
 
@@ -92,7 +95,7 @@ else:
 	config.excluded_log = None
 
 display_names = load_display_names(config.localization_path)
-tier_colors, prefab_tiers = load_tiers()
+tier_colors = load_tiers()
 biome_img = load_biome_image(config.biome_path, config.image_size)
 
 # === Label Mask ===
@@ -113,12 +116,18 @@ else:
 log, log_file = create_logger(args.verbose)
 
 # === Parse prefabs.xml ===
-def parse_prefabs(xml_path, biome_img, config):
+### 🧩 Prefab Placement Parser: Uses prefab metadata for accurate center shift and difficulty tier
+def parse_prefabs(xml_path, biome_img, config, prefab_info, display_names):
+	import xml.etree.ElementTree as ET
+	from collections import defaultdict
+	from filters import should_exclude
+
 	tree = ET.parse(xml_path)
 	root = tree.getroot()
 	categorized_points = defaultdict(list)
 	excluded_names = defaultdict(set)
 	missing_names = set()
+	tiers = {}
 	poi_counter = 0
 
 	def transform_coords(x, z):
@@ -137,14 +146,13 @@ def parse_prefabs(xml_path, biome_img, config):
 			excluded_names["excluded"].add(name)
 			continue
 
-		sx = float(deco.attrib.get("size_x", "0"))
-		sz = float(deco.attrib.get("size_z", "0"))
-		
-		# Shift to center of prefab footprint
+		# Position from XML
 		x, _, z = map(float, pos.split(","))
-		center_x = x + sx / 2
-		center_z = z + sz / 2
-		
+
+		# Lookup size and difficulty
+		size_x, size_z, difficulty = prefab_info.get(name, (0, 0, -1))
+		center_x = x + size_x / 2
+		center_z = z + size_z / 2
 		px, pz = transform_coords(center_x, center_z)
 
 		# Determine category
@@ -163,18 +171,21 @@ def parse_prefabs(xml_path, biome_img, config):
 
 		poi_id = f"P{poi_counter:04}"
 		categorized_points[category].append((poi_id, name, px, pz))
+		tiers[name] = difficulty
 		poi_counter += 1
 
 		if name not in display_names:
 			missing_names.add(name)
 
-	return categorized_points, excluded_names, missing_names
+	return categorized_points, excluded_names, missing_names, tiers
 
-categorized_points, excluded_names, missing_names = parse_prefabs(config.xml_path, biome_img, config)
+categorized_points, excluded_names, missing_names, prefab_tiers = parse_prefabs(
+	config.xml_path, biome_img, config, prefab_info, display_names
+)
 
 # === Render ===
 layer_files = []
-legend_entries = {}
+legend_entries = []
 if args.skip_layers:
 	if args.skip_layers:
 		legend_entries["P0000"] = ("DEBUG TEST POI", "debug_test_poi")
@@ -213,6 +224,10 @@ if not args.skip_layers:
 		if combined_path:
 			layer_files.append(combined_path)
 
+# POI Bounding boxes
+from render import render_bounding_box_layer
+render_bounding_box_layer(config)
+
 # === Render Legend ===
 def render_legend(legend_entries, config):
 	from PIL import ImageDraw
@@ -247,18 +262,18 @@ def render_legend(legend_entries, config):
 	# Calculate dynamic column width
 	col_spacing = 40
 	col_width = max(
-		font.getbbox(f"{poi_id} → {label}")[2]
-		for poi_id, label in legend_entries.items()
+		font.getbbox(f"{poi_id} → {display_name}")[2]
+		for poi_id, _, display_name in legend_entries
 	) + col_spacing
 
 	drawn_boxes = []
 	drawn_entries = []
-	for poi_id, (label, prefab_name) in sorted(legend_entries.items()):
+	for poi_id, prefab_name, display_name in sorted(legend_entries, key=lambda x: x[0]):
 		name_key = prefab_name.lower()
 		tier = prefab_tiers.get(name_key, -1)
 		dot_color = tier_colors.get(tier, "#FF0000")  # Default red for unknowns
 
-		text = f"{poi_id} → {label}"
+		text = f"{poi_id} → {display_name}"
 
 		if y + line_height > config.image_size[1] - 20:
 			if zone == "left":

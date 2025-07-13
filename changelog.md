@@ -1,5 +1,22 @@
 # Changelog
 
+## [v0.6.2] - 2025-07-13
+**Release Date:** 2025-07-13
+
+### Added
+- POI dots now use accurate prefab center positions based on size metadata from `.xml` files.
+- Difficulty tiers now parsed directly from individual prefab XMLs (`<property name="DifficultyTier" ...>`).
+- Legend rendering now supports complete POI ID → Display Name listings, especially in `--numbered-dots` mode.
+
+### Fixed
+- Duplicate POI_IDs in `legend_entries` no longer overwrite each other (now uses list, not dict).
+- `--numbered-dots` mode now renders correct POI_IDs in the legend.
+- Removed leftover bounding box debug layer.
+- Patched unbound variable error in `render_category_layer`.
+
+### Removed
+- Deprecated `diff.csv` difficulty mapping. All difficulty data is now sourced from prefab XMLs in the game directory!
+
 ## [0.6.1] - Green for launch
 **Release Date:** 2025-07-12
 ### Added

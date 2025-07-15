@@ -159,29 +159,57 @@ parser.add_argument(
 	default=25,
 	help="Font size for POI labels. Default is 25. Max is 60."
 )
+parser.add_argument(
+	"--blocks",
+	help="Path to .blocks.nim file or folder (used for voxelmap rendering)"
+)
+parser.add_argument(
+	"--prefab-xml",
+	help="Matching .xml file for a single prefab (used in voxelmap mode)"
+)
+parser.add_argument(
+	"--output",
+	help="Output path or folder for rendered voxel PNGs"
+)
 
+parser.add_argument(
+	"--only",
+	type=str,
+	help="Render only this prefab by name (without extension)"
+)
+parser.add_argument(
+	"--mode",
+	type=str,
+	default="default",
+	help="Choose rendering mode (default/test1/xyz/yxz/etc)"
+)
+
+
+def get_args():
+	args = parser.parse_args()
 # ----------------------------------------------
 # ✅ CLI arg validation
 # ----------------------------------------------
-args = parser.parse_args()
-# --only-biomes
-if args.only_biomes:
-	invalid = set(args.only_biomes) - VALID_BIOMES
-	if invalid:
-		parser.error(
-			f"Invalid biome name(s): {', '.join(invalid)}\n"
-			f"Valid options: {', '.join(sorted(VALID_BIOMES))}"
-		)
-# --xml, --localization, --biomes
-for path_arg, label in [(args.xml, "XML"), (args.localization, "Localization"), (args.biomes, "Biomes")]:
-	if path_arg and not os.path.isfile(path_arg):
-		parser.error(f"{label} file not found: {path_arg}")
 
-# --text-size
-if args.text_size > 60:
-	args.text_size = 60
-elif args.text_size < 10:
-	args.text_size = 10
+	# --only-biomes
+	if args.only_biomes:
+		invalid = set(args.only_biomes) - VALID_BIOMES
+		if invalid:
+			parser.error(
+				f"Invalid biome name(s): {', '.join(invalid)}\n"
+				f"Valid options: {', '.join(sorted(VALID_BIOMES))}"
+			)
+	# --xml, --localization, --biomes
+	for path_arg, label in [(args.xml, "XML"), (args.localization, "Localization"), (args.biomes, "Biomes")]:
+		if path_arg and not os.path.isfile(path_arg):
+			parser.error(f"{label} file not found: {path_arg}")
+	
+	# --text-size
+	if args.text_size > 60:
+		args.text_size = 60
+	elif args.text_size < 10:
+		args.text_size = 10
+	return args
 # ----------------------------------------------
 # ✅ Bounding box + overlap logic
 # ----------------------------------------------
@@ -321,3 +349,4 @@ def transform_coords(x, z, map_center=3072):
 	cx = int(x + map_center if x >= 0 else map_center - abs(x))
 	cz = int(map_center - z if z >= 0 else map_center + abs(z))
 	return cx, cz
+

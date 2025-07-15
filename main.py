@@ -1,6 +1,7 @@
 # main.py
 
-from helper import Config, args
+from helper import Config, get_args
+args = get_args()
 from parse import load_display_names, load_tiers, load_biome_image, extract_blue_zones
 from filters import should_exclude
 from render import render_category_layer

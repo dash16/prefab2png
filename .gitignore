@@ -4,6 +4,7 @@
 # Project files
 output*/
 heatmap/
+extract_palette.py
 
 
 # Byte-compiled / optimized / DLL files

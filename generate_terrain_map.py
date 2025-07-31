@@ -1,6 +1,12 @@
 from PIL import Image, ImageEnhance, ImageDraw
 import numpy as np
 import os
+from datetime import datetime
+
+# Create timestamped output folder
+timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+output_dir = f"output_terrain_{timestamp}"
+os.makedirs(output_dir, exist_ok=True)
 
 # File paths
 #raw_path = "dtm_processed.raw"
@@ -26,9 +32,10 @@ print(f"Loaded RAW: {len(raw_data)} bytes")
 if len(raw_data) != 6144 * 6144 * 2:
 	raise ValueError("RAW file size does not match expected 6144x6144 uint16 format.")
 
-# Decode heightmap
+# Decode and flip heightmap vertically to test RWG slot alignment
 height_data = np.frombuffer(raw_data, dtype=np.uint16).reshape((6144, 6144))
-height_normalized = (height_data - height_data.min()) / height_data.ptp()
+height_data = np.flipud(height_data)
+height_normalized = (height_data - height_data.min()) / np.ptp(height_data)
 
 # Load biome image
 biome_img = Image.open(biome_path).convert("RGB")
@@ -41,9 +48,9 @@ biome_array = np.array(biome_img)
 biomes = {
 	"Burnt Forest": {"color": (186, 0, 255), "shade": (48, 43, 43)},
 	"Desert":       {"color": (255, 228, 119), "shade": (127, 118, 104)},
-	"Pine Forest":  {"color": (0, 64, 0), "shade": (46, 62, 41)},
+	"Pine Forest":  {"color": (0, 64, 0), "shade": (40, 57, 44)},
 	"Snow":         {"color": (255, 255, 255), "shade": (149, 178, 195)},
-	"Wasteland":    {"color": (255, 168, 0), "shade": (84, 100, 73)}
+	"Wasteland":    {"color": (255, 168, 0), "shade": (181, 224, 57)}
 }
 
 from scipy.spatial import KDTree
@@ -65,8 +72,16 @@ matches_found = 0
 brightness = 1.4
 gamma = 0.9
 
-# Use softened brightness curve (emphasize midrange elevation)
-height_brightness = np.clip(np.sqrt(height_normalized), 0, 1)
+### 🧩 Enhanced Elevation Mapping: Boost midrange terrain contrast using log + equalization hybrid
+elev_shift = height_data - height_data.min() + 1
+log_scaled = np.log(elev_shift)
+log_norm = (log_scaled - log_scaled.min()) / np.ptp(log_scaled)
+
+# Histogram equalization of log-normalized data
+hist, bins = np.histogram(log_norm.flatten(), bins=256, range=(0, 1), density=True)
+cdf = hist.cumsum()
+cdf_normalized = (cdf - cdf.min()) / np.ptp(cdf)
+height_brightness = np.interp(log_norm.flatten(), bins[:-1], cdf_normalized).reshape(log_norm.shape)
 
 for i, name in enumerate(biome_names):
 	mask = biome_indices == i
@@ -101,10 +116,28 @@ for c in range(3):
 		0, 255
 	).astype(np.uint8)
 
-# Apply hillshading
+### 🧩 Directional Hillshading: Adds sun angle for 3D terrain shading
 gradient_x, gradient_y = np.gradient(height_data.astype(np.float32))
-slope = np.sqrt(gradient_x**2 + gradient_y**2)
-hillshade = 1 - np.clip(slope / slope.max(), 0, 1)
+
+# Compute slope and aspect
+slope_rad = np.arctan(np.hypot(gradient_x, gradient_y))
+aspect_rad = np.arctan2(gradient_y, -gradient_x)
+
+# Light source direction — sun from NW at 45°
+azimuth_rad = np.radians(315)
+altitude_rad = np.radians(45)
+
+# Hillshade using cosine law
+hillshade = (
+	np.sin(altitude_rad) * np.cos(slope_rad) +
+	np.cos(altitude_rad) * np.sin(slope_rad) * np.cos(azimuth_rad - aspect_rad)
+)
+hillshade = np.clip(hillshade, 0, 1)
+
+# Soft floor to prevent pure black shadows in valleys
+min_hillshade = 0.3  # Raise this to brighten shadows (e.g. 0.2 → 0.4)
+hillshade = np.clip(hillshade, min_hillshade, 1.0)
+
 hillshade = (hillshade * 255).astype(np.uint8)
 
 # Apply gamma correction to soften hillshade contrast
@@ -179,5 +212,7 @@ else:
 """
 
 # Save composite
-final_img.save("terrain_biome_shaded_final.png")
-print("✅ Saved: terrain_biome_shaded_final.png")
+output_path = os.path.join(output_dir, "terrain_biome_shaded_final.png")
+final_img.save(output_path)
+print(f"✅ Saved: {output_path}")
+

@@ -225,10 +225,6 @@ if not args.skip_layers:
 		if combined_path:
 			layer_files.append(combined_path)
 
-# POI Bounding boxes
-from render import render_bounding_box_layer
-render_bounding_box_layer(config)
-
 # === Render Legend ===
 def render_legend(legend_entries, config):
 	from PIL import ImageDraw
@@ -357,12 +353,6 @@ if args.verbose and excluded_names:
 			for name in sorted(names):
 				f.write(f"{cat},{name}\n")
 	print(f"📝 Excluded prefab names: {config.excluded_log}")
-
-#with open(os.path.join(config.log_dir or config.output_dir, "bounding_boxes.csv"), "w", encoding="utf-8") as f:
-#	f.write(f"# prefab2png version: {version}\n")
-#	f.write("poi_id,layer,x1,y1,x2,y2\n")
-#	for poi_id, layer, (x1, y1, x2, y2) in placed_bounding_boxes:
-#		f.write(f"{poi_id},{layer},{x1},{y1},{x2},{y2}\n")
 
 if config.verbose_log_file:
 	config.verbose_log_file.close()

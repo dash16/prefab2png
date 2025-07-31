@@ -2,7 +2,8 @@
 
 import os
 from PIL import Image, ImageDraw, ImageFont
-from filters import should_exclude
+from filters import should_exclude, BLOCK_CATEGORY_ALIASES, CATEGORY_COLORS
+from block_parser import load_tts, load_block_names, load_block_colors
 from labeler import (
 	wrap_label,
 	get_text_box,
@@ -11,7 +12,9 @@ from labeler import (
 	placed_bounding_boxes,
 	extended_green_zone_search
 )
-
+from helper import try_green_zone_label
+from block_analysis import categorize_surface, categorize_blocks
+'''
 # === Bounding box helper (optional future use) ===
 def boxes_overlap(box1, box2, padding=2):
 	return not (
@@ -20,6 +23,67 @@ def boxes_overlap(box1, box2, padding=2):
 		box1[3] + padding < box2[1] or
 		box1[1] - padding > box2[3]
 	)
+'''
+
+### 🧩 Top Block Renderer: Renders top-down image of a prefab using block colors
+def render_top_blocks(tts_path, blocks_path, blocks_xml_path):
+	"""
+	Renders a top-down image of the prefab's topmost blocks.
+		Returns:
+			PIL.Image.Image: Rendered image (not saved)
+	"""
+	# Load all inputs
+	block_names = load_block_names(blocks_path)
+	prefab = load_tts(tts_path, block_names)
+	block_colors = load_block_colors(blocks_xml_path)
+		
+	# Extract grid dimensions
+	grid = prefab["layers"]
+	sz = len(grid)
+	sy = len(grid[0])
+	sx = len(grid[0][0])
+	top_blocks = {}
+
+	# Scan for topmost non-air blocks
+	for z in range(sz):
+		for x in range(sx):
+			for y in reversed(range(sy)):
+				block_id = grid[z][y][x]
+				if block_id != 0:
+					top_blocks[(x, z)] = block_id
+					break
+
+	visible_ids = set(top_blocks.values())
+	category_map = categorize_blocks(visible_ids, block_names)
+
+	# Create transparent RGBA image
+	image = Image.new("RGBA", (sx, sz), (0, 0, 0, 0))
+	pixels = image.load()
+
+	for (x, z), block_id in top_blocks.items():
+		name = block_names.get(block_id, f"unknown_{block_id}")
+		rgb = block_colors.get(name)
+
+		# Fallback 1: try BLOCK_CATEGORY_ALIASES
+		if not rgb:
+			for prefix, alias in BLOCK_CATEGORY_ALIASES.items():
+				if name.startswith(prefix):
+					rgb = CATEGORY_COLORS.get(alias, (128, 128, 128))[:3]
+					break
+		
+		# Fallback 2: try block_analysis category
+		if not rgb:
+			cat = category_map.get(block_id)
+			if cat:
+				rgb = CATEGORY_COLORS.get(cat, (128, 128, 128))[:3]
+		
+		# Final fallback
+		if not rgb:
+			rgb = (128, 128, 128)
+			
+		pixels[x, z] = (*rgb, 255)
+
+	return image
 
 # === Label helpers ===
 # === Wedge ===
@@ -111,26 +175,59 @@ def render_category_layer(
 	rejection_attempts = 0
 	if numbered_dots:
 		for poi_id, name, px, pz in points:
-			display = display_names.get(name, name)
+			# 1️⃣ Add to legend
 			legend_entries.append((poi_id, name, display_names.get(name, name)))
-
-			bbox = font.getbbox(poi_id)
-			text_w = bbox[2] - bbox[0]
-			text_h = bbox[3] - bbox[1]
-			pad = 4
-			label_box = (
-				px - text_w // 2 - pad,
-				pz - text_h // 2 - pad,
-				px + text_w // 2 + pad,
-				pz + text_h // 2 + pad
-			)
+	
+			# 2️⃣ Try green zone placement
+			result = None
+			if label_mask:
+				result = try_green_zone_label(
+					poi_id, px, pz, font, label_mask, occupied_boxes, red_rgb
+				)
+			else:
+				# Use extended fallback without mask
+				from helper import check_label_overlap
+				bbox = font.getbbox(poi_id)
+				text_w = bbox[2] - bbox[0]
+				text_h = bbox[3] - bbox[1]
+				pad = 4
+				candidate_offsets = [(-text_w - 12, 0), (text_w + 12, 0), (0, -text_h - 12), (0, text_h + 12)]
+				for dx, dy in candidate_offsets:
+					lx = px + dx - text_w // 2
+					ly = pz + dy - text_h // 2
+					label_box = (lx - pad, ly - pad, lx + text_w + pad, ly + text_h + pad)
+					if check_label_overlap(label_box, occupied_boxes):
+						continue
+					result = (lx, ly, label_box)
+					break
+			if result:
+				lx, ly, label_box = result
+				log(f"✅ numbered-dots placed near dot for {poi_id}")
+			else:
+				# ⚠️ Fallback: center on the dot
+				bbox = font.getbbox(poi_id)
+				text_w = bbox[2] - bbox[0]
+				text_h = bbox[3] - bbox[1]
+				pad = 4
+				lx = px - text_w // 2
+				ly = pz - text_h // 2
+				label_box = (lx - pad, ly - pad, lx + text_w + pad, ly + text_h + pad)
+				log(f"⚠️ numbered-dots fallback for {poi_id}")
+	
+			# 3️⃣ Draw box and text
 			labels_draw.rounded_rectangle(label_box, radius=4, fill="white", outline="black")
-			labels_draw.text((px - text_w // 2, pz - text_h // 2), poi_id, fill="black", font=font)
-
+			labels_draw.text((lx, ly), poi_id, fill="black", font=font)
+	
+			# 4️⃣ Optional: draw connector wedge
+			draw_label_wedge_only(labels_draw, px, pz, label_box)
+	
+			# 5️⃣ Track occupied area
+			occupied_boxes.append(label_box)
+	
 		labels_path = os.path.join(config.output_dir, f"{category}_labels.png")
 		if points:
 			labels_img.save(labels_path)
-		return None, 0	  
+		return None, 0
 
 	for poi_id, name, px, pz in points:
 		display = display_names.get(name, name)

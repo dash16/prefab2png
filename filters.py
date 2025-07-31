@@ -50,3 +50,60 @@ def should_exclude(name: str) -> bool:
 			return True
 
 	return False
+
+# 🧩 Block Category Aliases: Maps known substrings to visual or semantic groupings
+BLOCK_CATEGORY_ALIASES = {
+	"palette": "material_wood",
+	"pallet": "material_wood",
+	"plank": "material_wood",
+	"crate": "material_wood",
+	"locker": "material_metal",
+	"shelf": "material_wood",
+	"cabinet": "material_wood",
+	"sink": "material_metal",
+	"barrel": "material_metal",
+	"vent": "material_metal",
+	"grate": "material_metal",
+	"radiator": "material_metal",
+	"rebar": "material_metal",
+	"vault": "material_metal",
+	"panel": "material_metal",
+	"mirror": "material_glass",
+	"tv": "material_glass",
+	"screen": "material_glass",
+	"glass": "material_glass"	
+}
+# 🧩 Block Category Colors: Provides global color palette for blocks to be rendered
+CATEGORY_COLORS = {
+	"material_concrete": (207, 207, 207, 255),
+	"material_wood": (176, 110, 61, 255),
+	"material_metal": (136, 136, 136, 255),
+	"color_white": (248, 248, 248, 255),
+	"color_brown": (156, 107, 74, 255),
+	"color_grey": (160, 160, 160, 255),
+	"color_red": (160, 48, 48, 255),
+	"color_green": (64, 160, 64, 255),
+	"color_blue": (80, 96, 176, 255),
+	"color_black": (28, 28, 28, 255),
+	"color_yellow": (224, 208, 80, 255),
+	"material_terrain": (124, 111, 95, 255),
+	"material_gravel": (153, 153, 153, 255),
+	"material_brick": (169, 71, 60, 255),
+	"color_orange": (232, 124, 51, 255),
+	"color_tan": (205, 187, 154, 255),
+	"material_stone": (131, 127, 118, 255),
+	"material_asphalt": (79, 79, 79, 255),
+	"material_plastic": (200, 200, 208, 255),
+	"material_dirt": (150, 122, 80, 255),
+	"material_cinder": (176, 176, 176, 255),
+	"color_purple": (153, 102, 204, 255),
+	"material_road": (85, 85, 85, 255),
+	"color_pink": (235, 166, 198, 255),
+	"material_cement": (208, 208, 208, 255),
+	"material_rust": (148, 74, 29, 255),
+	"material_fabric": (210, 180, 140, 255),
+	"material_tile": (182, 173, 161, 255),
+	"material_steel": (160, 160, 160, 255),
+	"material_trash": (110, 110, 110, 255),
+	"material_glass": (200, 220, 255, 255)
+}

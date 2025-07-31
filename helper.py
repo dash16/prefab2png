@@ -17,7 +17,12 @@ from PIL import ImageFont
 import os
 import datetime
 import platform
+import csv
+import re
+from filters import BLOCK_CATEGORY_ALIASES
+
 VALID_BIOMES = {"pine_forest", "desert", "snow", "burnt_forest", "wasteland"}
+
 def get_version():
 	try:
 		with open("version.txt", "r", encoding="utf-8") as f:
@@ -49,25 +54,41 @@ class Config:
 		self.debug_extended = self.args.extended_placement_debug
 		
 	def resolve_paths(self):
-		if self.args.xml and self.args.localization and self.args.biomes and self.args.prefab_dir:
-			return self.args.xml, self.args.localization, self.args.biomes, self.args.prefab_dir
-	
-		elif platform.system() == "Windows":
+		if platform.system() == "Windows":
 			base = os.path.expandvars(r"%ProgramFiles(x86)%\Steam\steamapps\common\7 Days To Die")
-			return (
-				os.path.join(base, "Data/Worlds/Navezgane/prefabs.xml"),
-				os.path.join(base, "Data/Config/Localization.txt"),
-				os.path.join(base, "Data/Worlds/Navezgane/biomes.png"),
-				os.path.join(base, "Data/Prefabs")
-			)
+			default_xml = os.path.join(base, "Data/Worlds/Navezgane/prefabs.xml")
+			default_localization = os.path.join(base, "Data/Config/Localization.txt")
+			default_biomes = os.path.join(base, "Data/Worlds/Navezgane/biomes.png")
+			default_prefab_dir = os.path.join(base, "Data/Prefabs")
+			default_blocks = os.path.join(base, "Data/Config/blocks.xml")
 		else:
 			base = os.path.expanduser("~/Library/Application Support/Steam/steamapps/common/7 Days To Die/7DaysToDie.app/Data")
-			return (
-				os.path.join(base, "Worlds/Navezgane/prefabs.xml"),
-				os.path.join(base, "Config/Localization.txt"),
-				os.path.join(base, "Worlds/Navezgane/biomes.png"),
-				os.path.join(base, "Prefabs")
-			)
+			default_xml = os.path.join(base, "Worlds/Navezgane/prefabs.xml")
+			default_localization = os.path.join(base, "Config/Localization.txt")
+			default_biomes = os.path.join(base, "Worlds/Navezgane/biomes.png")
+			default_prefab_dir = os.path.join(base, "Prefabs")
+			default_blocks = os.path.join(base, "Config/blocks.xml")
+	
+		# ✅ Always assign these
+		xml = self.args.xml or default_xml
+		localization = self.args.localization or default_localization
+		biomes = self.args.biomes or default_biomes
+		prefab_dir = self.args.prefab_dir or default_prefab_dir
+	
+		# ✅ Save blocks.xml
+		self.default_blocks_path = default_blocks
+	
+		# Optional print
+		if not self.args.xml:
+			print("⚠️  No --xml argument provided. Defaulting to Navezgane prefab paths.")
+		else:
+			print("📂 Resolved paths:")
+			print(f"   • XML:           {xml}")
+			print(f"   • Localization:  {localization}")
+			print(f"   • Biomes:        {biomes}")
+			print(f"   • Prefab Dir:    {prefab_dir}")
+	
+		return xml, localization, biomes, prefab_dir
 
 	def resolve_font_path(self):
 		return "C:\\Windows\\Fonts\\arial.ttf" if platform.system() == "Windows" else "/System/Library/Fonts/Supplemental/Arial.ttf"
@@ -261,6 +282,8 @@ def is_placeable(label_box, label_mask, red_rgb):
 # ----------------------------------------------
 
 def try_green_zone_label(text, base_x, base_y, font, mask, occupied_boxes, red_rgb):
+	if mask is None:
+			return None
 	bbox = font.getbbox(text)
 	text_w = bbox[2] - bbox[0]
 	text_h = bbox[3] - bbox[1]
@@ -344,9 +367,89 @@ def should_exclude(name):
 	return False
 # ----------------------------------------------
 # ✅ Normalize coordinates
-# ----------------------------------------------	
+# ----------------------------------------------
 def transform_coords(x, z, map_center=3072):
 	cx = int(x + map_center if x >= 0 else map_center - abs(x))
 	cz = int(map_center - z if z >= 0 else map_center + abs(z))
 	return cx, cz
+
+# ----------------------------------------------
+# ✅ Normalize blocks to categories to map colors
+# ----------------------------------------------
+
+def normalize_name(name):
+	name = name.strip().lower()
+
+	skip_keywords = [
+		"sleeper", "cobweb", "trash", "decal", "gore", "paper", "cloth", "clothpile", "box", "bag",
+		"toilet", "sink", "bathtub", "faucet", "light", "fan", "vent", "candle", "spider", "crate", "decor",
+		"cash", "mug", "jar", "plate", "glass", "bottle", "bone", "flesh", "skull", "carton", "urn", "shard",
+		"poster", "mirror", "note", "magazine", "frame", "flag", "painting", "lamp"
+	]
+
+	material_keywords = [
+		"wood", "metal", "steel", "concrete", "brick", "trash", "glass", "stone", "asphalt", "tile", "shingle",
+		"plaster", "roof", "gravel", "terrain", "road", "dirt", "soil", "sand", "marble", "cinder", "cement"
+	]
+
+	color_keywords = [
+		"red", "green", "blue", "gray", "grey", "white", "black",
+		"brown", "yellow", "tan", "pink", "orange", "purple"
+	]
+
+	if not name.isidentifier():
+		return None
+	if any(skip in name for skip in skip_keywords):
+		return None
+
+	# Remove common suffixes
+	name = re.sub(r'(left|right|top|bottom|corner)$', '', name)
+	name = re.sub(r'\d+$', '', name)
+	name = re.sub(r'[_]+$', '', name)
+
+	# Color category
+	for color in color_keywords:
+		if color in name:
+			return f"color_{color}"
+
+	# Material category
+	for material in material_keywords:
+		if material in name:
+			return f"material_{material}"
+
+	if len(name) < 4:
+		return None
+
+	return name
+
+# ----------------------------------------------
+# ✅ Loads color palette of category mappings
+# ----------------------------------------------
+def load_color_palette(path):
+	color_map = {}
+	with open(path, newline='') as f:
+		reader = csv.DictReader(f)
+		for row in reader:
+			key = row['category'].strip().lower()
+			value = row['color_hex'].strip()
+			if key and value:
+				color_map[key] = value
+	return color_map
+
+# ----------------------------------------------
+# ✅ Parse XML to get prefab orientation to North
+# ----------------------------------------------
+def get_rotation_to_north(prefab_name, prefab_dir):
+	xml_path = os.path.join(prefab_dir, f"{prefab_name}.xml")
+	if not os.path.exists(xml_path):
+		return 0  # Default fallback
+
+	try:
+		tree = ET.parse(xml_path)
+		for prop in tree.findall(".//property"):
+			if prop.attrib.get("name") == "RotationToFaceNorth":
+				return int(prop.attrib.get("value", 0))
+	except Exception as e:
+		print(f"⚠️ Failed to parse RotationToFaceNorth for {prefab_name}: {e}")
+	return 0
 

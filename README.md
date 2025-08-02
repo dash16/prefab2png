@@ -3,7 +3,7 @@
 
 ![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)
 ![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)
-![Release](https://img.shields.io/badge/release-v0.5-green.svg)
+![Release](https://img.shields.io/badge/release-v0.7-green.svg)
 ![Pillow](https://img.shields.io/badge/made%20with-Pillow-yellow.svg)
 ![GitHub issues](https://img.shields.io/github/issues/dash16/prefab2png)
 

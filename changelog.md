@@ -13,7 +13,10 @@ This file tracks version history for `prefab2png`.  Previous Changelog in docs/
   - `POIMarkerPartRotations` parsing
   - Inferred placement during render pass
   - Global flip rules and authored tile exclusions
-- Rotation logic replaces abandoned "quadrant theory" with real render-based alignment
+- Improved block color parsing for visual fidelity:
+  - Prioritizes `Map.Color` from `blocks.xml`
+  - Falls back to `TintColor`
+  - Uses semantic name-based coloring when no color defined
 
 ### Excluded
 - POI rotation correction inside RWG tiles (still under active development)

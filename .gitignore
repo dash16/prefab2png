@@ -5,7 +5,8 @@
 output*/
 heatmap/
 graveyard/
-stickers/
+stickers*/
+local_stuff/
 
 
 # Byte-compiled / optimized / DLL files

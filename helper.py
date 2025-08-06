@@ -19,6 +19,7 @@ import datetime
 import platform
 import csv
 import re
+import xml.etree.ElementTree as ET
 from filters import BLOCK_CATEGORY_ALIASES
 
 VALID_BIOMES = {"pine_forest", "desert", "snow", "burnt_forest", "wasteland"}
@@ -52,7 +53,8 @@ class Config:
 		self.missing_log = None
 		self.excluded_log = None
 		self.debug_extended = self.args.extended_placement_debug
-		
+		self.verbose = args.verbose
+
 	def resolve_paths(self):
 		if platform.system() == "Windows":
 			base = os.path.expandvars(r"%ProgramFiles(x86)%\Steam\steamapps\common\7 Days To Die")
@@ -205,7 +207,6 @@ parser.add_argument(
 	help="Choose rendering mode (default/test1/xyz/yxz/etc)"
 )
 
-
 def get_args():
 	args = parser.parse_args()
 # ----------------------------------------------
@@ -327,28 +328,40 @@ def try_green_zone_label(text, base_x, base_y, font, mask, occupied_boxes, red_r
 # ✅ Prefab XML loader
 # ----------------------------------------------
 
-import xml.etree.ElementTree as ET
-
 def load_prefabs_from_xml(xml_path):
 	"""
-	Parses prefabs.xml and returns a list of (POI_ID, name, x, z) tuples.
-	Supports prefabs defined using position="x,y,z" attribute.
+	Parses prefabs.xml and returns a list of dicts with:
+	- poi_id
+	- name
+	- x, z
+	- rotation
 	"""
+	import xml.etree.ElementTree as ET
+
 	tree = ET.parse(xml_path)
 	root = tree.getroot()
 	prefabs = []
 	i = 0
+
 	for elem in root.iter():
 		name = elem.get("name")
 		position = elem.get("position")
+		rotation = elem.get("rotation", "0")
 		if not name or not position:
 			continue
 		try:
 			x, y, z = map(float, position.split(","))
 			i += 1
-			prefabs.append((f"POI_{i}", name, int(x), int(z)))
+			prefabs.append({
+				"poi_id": f"POI_{i}",
+				"name": name,
+				"x": int(x),
+				"z": int(z),
+				"rotation": int(rotation)
+			})
 		except ValueError:
 			continue
+
 	print(f"✅ Found {len(prefabs)} prefab entries.")
 	return prefabs
 
@@ -436,20 +449,89 @@ def load_color_palette(path):
 				color_map[key] = value
 	return color_map
 
-# ----------------------------------------------
-# ✅ Parse XML to get prefab orientation to North
-# ----------------------------------------------
-def get_rotation_to_north(prefab_name, prefab_dir):
-	xml_path = os.path.join(prefab_dir, f"{prefab_name}.xml")
-	if not os.path.exists(xml_path):
-		return 0  # Default fallback
+### 🧩 Recursive Prefab XML Finder: Resolves prefab XML path from name by walking directory tree
+def find_prefab_xml(name, prefab_dir):
+	for root, _, files in os.walk(prefab_dir):
+		if f"{name}.xml" in files:
+			return os.path.join(root, f"{name}.xml")
+	return None
 
+### 🧩 Rotation Extractor: Reads RotationToFaceNorth from prefab XML metadata
+def get_rotation_to_north(name, prefab_dir):
+	xml_path = find_prefab_xml(name, prefab_dir)
+	if not xml_path:
+		print(f"❌ Prefab XML not found: {name} in {prefab_dir}")
+		return 0
 	try:
 		tree = ET.parse(xml_path)
-		for prop in tree.findall(".//property"):
+		root = tree.getroot()
+		for prop in root.findall("property"):
 			if prop.attrib.get("name") == "RotationToFaceNorth":
-				return int(prop.attrib.get("value", 0))
+				val = int(prop.attrib.get("value", 0))
+				print(f"🧭 {name} → RotationToFaceNorth: {val} (from {xml_path})")
+				return val
+		print(f"⚠️ {name}: No RotationToFaceNorth tag found (default 0) — {xml_path}")
+		return 0
 	except Exception as e:
-		print(f"⚠️ Failed to parse RotationToFaceNorth for {prefab_name}: {e}")
-	return 0
+		print(f"💥 Error parsing {xml_path}: {e}")
+		return 0
 
+### 🧩 RWG POI Transformer: Applies tile rotation to POI offset and rotation
+def rotate_poi_within_tile(local_x, local_z, tile_rotation_degrees):
+	# Rotation is clockwise in 90° steps
+	if tile_rotation_degrees == 90:
+		return -local_z, local_x
+	elif tile_rotation_degrees == 180:
+		return -local_x, -local_z
+	elif tile_rotation_degrees == 270:
+		return local_z, -local_x
+	else:
+		return local_x, local_z
+
+### 🧩 Embedded POI Extractor: Parses POIMarkers from RWG tile XML and rotates into world space
+def parse_embedded_pois(tile_name, tile_x, tile_z, tile_rotation, prefab_dir):
+	import os
+	import xml.etree.ElementTree as ET
+
+	xml_path = os.path.join(prefab_dir, f"{tile_name}.xml")
+	if not os.path.exists(xml_path):
+		return []
+
+	tree = ET.parse(xml_path)
+	root = tree.getroot()
+
+	def get_prop(name):
+		elem = root.find(f".//property[@name='{name}']")
+		return elem.get("value").strip() if elem is not None else None
+
+	names = get_prop("POIMarker")
+	positions = get_prop("POIMarkerPartPositions")
+	rotations = get_prop("POIMarkerPartRotations")
+
+	if not (names and positions and rotations):
+		return []
+
+	name_list = [n.strip() for n in names.split("#")]
+	pos_list = [tuple(map(int, s.strip().split(","))) for s in positions.split("#")]
+	rot_list = [int(r.strip()) for r in rotations.split("#")]
+
+	if not (len(name_list) == len(pos_list) == len(rot_list)):
+		return []  # Malformed
+
+	embedded = []
+	for name, (lx, _, lz), local_rot in zip(name_list, pos_list, rot_list):
+		# Rotate local (lx, lz) into world space
+		wx, wz = rotate_poi_within_tile(lx, lz, tile_rotation * 90)
+		abs_x = tile_x + wx
+		abs_z = tile_z + wz
+		abs_rot = (local_rot + tile_rotation) % 4
+
+		embedded.append({
+			"name": name,
+			"x": abs_x,
+			"z": abs_z,
+			"rotation": abs_rot,
+			"parent_tile": tile_name
+		})
+
+	return embedded

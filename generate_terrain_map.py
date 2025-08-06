@@ -2,23 +2,31 @@ from PIL import Image, ImageEnhance, ImageDraw
 import numpy as np
 import os
 from datetime import datetime
+import argparse
 
 # Create timestamped output folder
 timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
 output_dir = f"output_terrain_{timestamp}"
 os.makedirs(output_dir, exist_ok=True)
 
-# File paths
-#raw_path = "dtm_processed.raw"
-#biome_path = "biomes.png"
-#splat_path = "splat3_processed.png"
-#radiation_path = "radiation.png"
+### 🧩 Directory CLI: Accepts one folder path to find RAW, biome, and splat3 files
+def parse_args():
+	parser = argparse.ArgumentParser(description="Generate terrain map from world directory")
+	parser.add_argument("--dir", required=True, help="Path to world folder (must contain dtm_processed.raw, biomes.png, splat3_processed.png)")
+	return parser.parse_args()
+
 output_path = "terrain_biome_shaded_final.png"
 
-raw_path ="/Users/dustinn/Projects/gamefiles/RWG/dtm_processed.raw"
-biome_path = "/Users/dustinn/Projects/gamefiles/RWG/biomes.png"
-splat_path = "/Users/dustinn/Projects/gamefiles/RWG/splat3_processed.png"
-#radiation_path = "/Users/dustinn/Projects/gamefiles/RWG/radiation.png"
+args = parse_args()
+world_dir = args.dir
+
+raw_path = os.path.join(world_dir, "dtm_processed.raw")
+biome_path = os.path.join(world_dir, "biomes.png")
+splat_path = os.path.join(world_dir, "splat3_processed.png")
+
+for path in [raw_path, biome_path, splat_path]:
+	if not os.path.exists(path):
+		raise FileNotFoundError(f"Missing required file: {path}")
 
 # Map Size, change as necessary for larger worlds
 map_size = 6144

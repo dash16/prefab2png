@@ -2,14 +2,18 @@
 
 This file tracks version history for `prefab2png`.  Previous Changelog in docs/
 
-## v0.7.0 — RWG Sticker Support (First Pass)
-**Release Date:** 2025-07-31
+## v0.7.1 – RWG Tile Sticker Rendering + Rotation Normalization  
+**Release Date:** 2025-08-06
 
-- Project structure updated
-- Documentation moved to `docs/` folder
-- Added full support for rendering individual PNG stickers from prefab folders
-- make_stickers.py recursively scans subdirectories (e.g. POIs/, RWGTiles/) for .tts + .blocks.nim pairs
-- Integrated render_top_blocks() to visualize topmost visible blocks with color from blocks.xml, name prefixes, and material categories earlier in the pipeline to optimize render times
-- Introduced category-based color fallback when XML or alias data is missing
-- Cleaned up legacy logic in block_analysis.py to focus on visible block IDs only
-- Prepared foundation for RWG terrain overlays, prefab terrain stamping, and visual tile compositing in future versions
+### Added
+- Support for rendering RWG world tiles (`rwg_tile_*.tts`) as top-down stickers
+- Renders are saved as transparent PNGs to `stickers__YYYY-MM-DD_HHMM/` (timestamped)
+- PNGs are aligned bottom-center for consistent placement over terrain
+- Automatically rotates RWG tile stickers so they face North, based on:
+  - `POIMarkerPartRotations` parsing
+  - Inferred placement during render pass
+  - Global flip rules and authored tile exclusions
+- Rotation logic replaces abandoned "quadrant theory" with real render-based alignment
+
+### Excluded
+- POI rotation correction inside RWG tiles (still under active development)

@@ -38,8 +38,8 @@ def load_block_names(path):
 
 	print(f"✅ Parsed {len(block_names)} block names from .blocks.nim")
 	for block_id, name in block_names.items():
-		print(f"🔍 ID {block_id} → {name}")
-	return block_names
+#		print(f"🔍 ID {block_id} → {name}")
+		return block_names
 
 
 ### 🧩 Block Color Loader: Loads both Map.Color and TintColor from blocks.xml
@@ -116,9 +116,6 @@ def unpack(bin_file, data_type, length_arg=0):
 
 ### 🧩 Prefab TTS Loader: Reads .tts binary format and reconstructs 3D block data
 def load_tts(filepath, local_palette=None):
-#	global_palette = load_global_block_palette_csv()
-#	print(f"✅ Loaded {len(global_palette)} global block mappings")
-
 	with open(filepath, "rb") as bin_file:
 		header = unpack(bin_file, "s", 4)
 		version = unpack(bin_file, "I")

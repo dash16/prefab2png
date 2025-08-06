@@ -26,20 +26,21 @@ def classify_block(block_name):
 			return category
 
 	# Fallback heuristics (minimal and safe)
-	if "wood" in name:
+	name = name.lower()
+	base_name = name.split(":")[-1]
+	
+	if "wood" in base_name or "wood" in name:
+		print(f"[CLASSIFY] {block_name} → wood")
 		return "wood"
-	if "metal" in name or "truss" in name:
+	if "metal" in base_name or "metal" in name:
+		print(f"[CLASSIFY] {block_name} → metal")
 		return "metal"
-	if "concrete" in name or "cobble" in name:
+	if "concrete" in base_name or "concrete" in name:
+		print(f"[CLASSIFY] {block_name} → concrete")
 		return "concrete"
-	if "terrain" in name:
-		return "terrain"
-	if "roof" in name:
-		return "roof"
-	if "light" in name:
-		return "light"
-	if "air" in name:
-		return "air"
+	if "brick" in base_name or "brick" in name:
+		print(f"[CLASSIFY] {block_name} → brick")
+		return "brick"
 
 	return "unknown"
 '''
@@ -106,6 +107,8 @@ def categorize_surface(prefab, block_names):
 	Creates a 2D grid of category labels from the topmost visible (non-air) block in each column.
 	Returns a 2D list: surface[z][x] = category
 	"""
+	if category:
+		print(f"[SURFACE] Block {block_id} '{block_name}' → {category}")
 	layers = prefab["layers"]
 	size_z = len(layers)            # vertical height
 	size_y = len(layers[0])         # rows (world Z)

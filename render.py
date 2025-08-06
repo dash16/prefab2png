@@ -26,7 +26,7 @@ def boxes_overlap(box1, box2, padding=2):
 '''
 
 ### 🧩 Top Block Renderer: Renders top-down image of a prefab using block colors
-def render_top_blocks(tts_path, blocks_path, blocks_xml_path):
+def render_top_blocks(tts_path, blocks_path, blocks_xml_path, config):
 	"""
 	Renders a top-down image of the prefab's topmost blocks.
 		Returns:
@@ -36,7 +36,9 @@ def render_top_blocks(tts_path, blocks_path, blocks_xml_path):
 	block_names = load_block_names(blocks_path)
 	prefab = load_tts(tts_path, block_names)
 	block_colors = load_block_colors(blocks_xml_path)
-		
+	# 🛠️ Manual override for terrainGravel to better match splatmap road blending
+	block_colors["terrAsphalt"] = (94, 93, 94)
+
 	# Extract grid dimensions
 	grid = prefab["layers"]
 	sz = len(grid)
@@ -61,28 +63,54 @@ def render_top_blocks(tts_path, blocks_path, blocks_xml_path):
 	pixels = image.load()
 
 	for (x, z), block_id in top_blocks.items():
+		matched_color = False
 		name = block_names.get(block_id, f"unknown_{block_id}")
 		rgb = block_colors.get(name)
-
-		# Fallback 1: try BLOCK_CATEGORY_ALIASES
+		if rgb:
+			matched_color = True
+		# Fallback: fuzzy match using BLOCK_CATEGORY_ALIASES and CATEGORY_COLORS keys
 		if not rgb:
-			for prefix, alias in BLOCK_CATEGORY_ALIASES.items():
-				if name.startswith(prefix):
-					rgb = CATEGORY_COLORS.get(alias, (128, 128, 128))[:3]
+			name_lower = name.lower()
+			matched_category = None
+		
+			# Step 1: Try BLOCK_CATEGORY_ALIASES
+			for keyword, category in BLOCK_CATEGORY_ALIASES.items():
+				if keyword in name_lower:
+					matched_category = category
 					break
 		
-		# Fallback 2: try block_analysis category
-		if not rgb:
-			cat = category_map.get(block_id)
-			if cat:
-				rgb = CATEGORY_COLORS.get(cat, (128, 128, 128))[:3]
+			if matched_category:
+				color = CATEGORY_COLORS.get(matched_category)
+				if color:
+					rgb = color
+					if config.verbose:
+						print(f"[FUZZY COLOR] '{name}' → keyword '{keyword}' → '{matched_category}' → {rgb}")
+				elif config.verbose:
+					print(f"[FUZZY MISS] Matched '{keyword}' → '{matched_category}' but no color assigned")
+			else:
+				# Step 2: Try keywords directly from CATEGORY_COLORS
+				for category in CATEGORY_COLORS.keys():
+					if category.lower() in name_lower:
+						color = CATEGORY_COLORS[category]
+						rgb = color
+						if config.verbose:
+							print(f"[FUZZY COLOR CATEGORY] '{name}' → matched keyword '{category}' → {rgb}")
+						break
 		
+				if not rgb and config.verbose:
+					print(f"[FUZZY NOMATCH] No keyword match for block '{name}'")
+
 		# Final fallback
 		if not rgb:
-			rgb = (128, 128, 128)
-			
-		pixels[x, z] = (*rgb, 255)
+			if config.verbose:
+				print(f"🎨 Missing color for block '{name}' (ID {block_id})")
+			rgb = (0, 0, 0, 0)
 
+		if len(rgb) == 4:
+			pixels[x, z] = rgb
+		else:
+			pixels[x, z] = (*rgb, 255)
+		
 	return image
 
 # === Label helpers ===

@@ -1,4 +1,4 @@
-# make_stickers.py (finalized)
+# make_stickers.py 
 
 import os
 import time
@@ -28,6 +28,11 @@ def main():
 
 	args = get_args()
 	config = Config(args)
+	with open("verbose_log.txt", "a", encoding="utf-8") as f:
+		def log_both(msg):
+			print(msg)
+			print(msg, file=f)
+		config.log_resolved_paths_once(log=log_both)
 	print(f"🔍 Scanning prefab directory: {config.prefab_dir}")
 #	print(f"📁 Directory contents (first 10 files): {os.listdir(config.prefab_dir)[:10]}")
 

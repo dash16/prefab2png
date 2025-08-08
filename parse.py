@@ -168,3 +168,25 @@ def categorize_points(prefabs, display_names, tier_data, biome_image):
 		dot_centers_by_category[category].append((px, pz))
 
 	return categorized_points, dot_centers_by_category
+	
+### 🧩 Tile Rotation Lookup: Builds a (x, z) → (tile_name, rotation) mapping for all RWG tiles
+def build_tile_rotation_lookup(prefabs_xml_path):
+	tile_map = {}
+	tree = ET.parse(prefabs_xml_path)
+	root = tree.getroot()
+	for deco in root.findall(".//decoration[@type='model']"):
+		name = deco.attrib["name"]
+		if name.startswith("rwg_tile_"):
+			pos = deco.attrib["position"]
+			rot = int(deco.attrib.get("rotation", 0))
+			x, _, z = map(int, pos.split(","))
+			tile_map[(x, z)] = (name, rot)
+	return tile_map
+
+### 🧩 Tile Lookup by POI: Checks if a POI falls inside any RWG tile by comparing world coords
+def find_tile_for_poi(poi_x, poi_z, tile_map, tile_size=150):
+	for (tile_x, tile_z), (name, rot) in tile_map.items():
+		if (tile_x <= poi_x < tile_x + tile_size) and (tile_z <= poi_z < tile_z + tile_size):
+			return name, rot
+	return None, None
+	

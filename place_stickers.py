@@ -3,19 +3,12 @@
 import os
 import glob
 from PIL import Image
-from helper import Config, get_args, load_prefabs_from_xml, transform_coords, get_rotation_to_north, rotate_poi_within_tile, parse_embedded_pois
-from parse import load_display_names
+from helper import Config, get_args, load_prefabs_from_xml, transform_coords, get_rotation_to_north, rotate_poi_within_tile, parse_embedded_poi_slots
+from parse import load_display_names, find_tile_for_poi, build_tile_rotation_lookup
 import xml.etree.ElementTree as ET
 import numpy as np
 import datetime
-
-args = get_args()
-config = Config(args)
-display_names = load_display_names(config.localization_path)
-prefabs = load_prefabs_from_xml(config.xml_path)
-tree = ET.parse(config.xml_path)
-root = tree.getroot()
-prefab_elements = root.findall("decoration")
+import time
 
 ### 🧩 Sticker Loader: Attempts to load a PNG prefab image from known filename formats
 def load_sticker(name, directory):
@@ -56,12 +49,27 @@ def get_rwg_tile_bounds(name, x, z, rotation):
 	}
 
 ### 🧩 Main Overlay Routine: Loads terrain canvas and overlays each valid POI sticker
-def place_stickers():
-	config.resolve_paths()
-	import datetime
+def place_stickers(config):
+	start_time = time.perf_counter()
+	display_names = load_display_names(config.localization_path)
+	prefabs = load_prefabs_from_xml(config.xml_path)
+	tree = ET.parse(config.xml_path)
+	root = tree.getroot()
+	prefab_elements = root.findall("decoration")
+	# Prepare verbose log file (no console stream)
+	
 	timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M")
 	config.output_dir = f"output_sticker_overlay__{timestamp}"
-
+	os.makedirs(config.output_dir, exist_ok=True)
+	verbose_path = os.path.join(config.output_dir, "verbose_log.txt")
+	verbose_log = open(verbose_path, "w", encoding="utf-8")
+	log_path = os.path.join(config.log_dir or config.output_dir, "missing_stickers.txt")
+	debug_log = None
+	if config.verbose:
+		debug_log_path = os.path.join(config.output_dir, "sticker_debug_log.csv")
+		debug_log = open(debug_log_path, "w", encoding="utf-8")
+		debug_log.write("name,display_name,rotation,rotation_to_north,net_rotation,net_degrees,w,h,x,z,draw_x,draw_z\n")
+		
 	# Load terrain and sticker layers
 	terrain_candidates = sorted(glob.glob("output_terrain_*/terrain_biome_shaded_final.png"), reverse=True)
 	if not terrain_candidates:
@@ -72,18 +80,12 @@ def place_stickers():
 	if not sticker_folders:
 		raise FileNotFoundError("❌ No sticker folders found.")
 	stickers_path = sticker_folders[0]
-
-	os.makedirs(config.output_dir, exist_ok=True)
-	log_path = os.path.join(config.log_dir or config.output_dir, "missing_stickers.txt")
-	debug_log_path = os.path.join(config.output_dir, "sticker_debug_log.csv")
-	debug_log = open(debug_log_path, "w", encoding="utf-8")
-
+	
 	# --- 🖼️ Load base terrain and prepare layers ---
 	base_img = Image.open(terrain_path).convert("RGBA")
 	rwg_img = Image.new("RGBA", base_img.size, (0, 0, 0, 0))
 	sticker_only_img = Image.new("RGBA", base_img.size, (0, 0, 0, 0))
-	debug_log.write("name,display_name,rotation,rotation_to_north,net_rotation,net_degrees,w,h,x,z,draw_x,draw_z\n")
-
+	
 	rwg_tiles = []
 	count = 0
 
@@ -136,7 +138,8 @@ def place_stickers():
 		draw_x, draw_z = transform_coords(x, z, config.map_center)
 		draw_z -= h
 		
-		debug_log.write(f"{name},{display_name},{rotation},{rotation_to_north},{net_rotation},{net_degrees},{w},{h},{x},{z},{draw_x},{draw_z}\n")
+		if debug_log:
+			debug_log.write(f"{name},{display_name},{rotation},{rotation_to_north},{net_rotation},{net_degrees},{w},{h},{x},{z},{draw_x},{draw_z}\n")
 		if config.verbose:
 			print(f"🧱 Placed RWG tile: {name} at ({x}, {z}) with rotation {rotation} → north {rotation_to_north}")
 		if not sticker:
@@ -157,20 +160,25 @@ def place_stickers():
 		rwg_tiles.append(get_rwg_tile_bounds(name, x, z, rotation))
 		count += 1
 
-	# --- After RWG: Parse embedded POIs ---
-	embedded_pois = []
+	# Build dict of RWG slots to to properly rotate prefabs placed in them
+	embedded_rotation_lookup = {}
+	
 	for tile in rwg_tiles:
-		embedded = parse_embedded_pois(
+		slots = parse_embedded_poi_slots(
 			tile_name=tile["name"],
 			tile_x=tile["x"],
 			tile_z=tile["z"],
 			tile_rotation=tile["rotation"],
 			prefab_dir=config.prefab_dir
 		)
-		embedded_pois.extend(embedded)
+		for slot in slots:
+			embedded_rotation_lookup[(slot["x"], slot["z"])] = {
+				"rotation": slot["rotation"],
+				"tile": slot["parent_tile"]
+			}
 
 	# --- Pass 2: Place all other POIs (including embedded) ---
-	for poi in prefabs + embedded_pois:
+	for poi in prefabs:
 		name = poi["name"]
 		if name.startswith("rwg_tile"):
 			continue
@@ -184,22 +192,27 @@ def place_stickers():
 
 		sticker = sticker.transpose(Image.FLIP_LEFT_RIGHT)
 
-		# --- Check if this POI is inside an RWG tile ---
-		containing_tile = None
-		for tile in rwg_tiles:
-			if tile["x_min"] <= x < tile["x_max"] and tile["z_min"] <= z < tile["z_max"]:
-				containing_tile = tile
-				break
+		key = (x, z)
+		
+		if key in embedded_rotation_lookup:
+			# POI is placed on a defined slot inside an RWG tile
+			slot_data = embedded_rotation_lookup[key]
+			rotation = slot_data["rotation"]
+			rotation_to_north = get_rotation_to_north(name, config.prefab_dir)
+			net_rotation = (rotation + rotation_to_north) % 4
+		
+			if config.verbose:
+				print(f"🔄 Matched POI marker slot inside {slot_data['tile']}: {name}")
+				print(f"    POI Rotation:        {rotation} × 90°")
+				print(f"    RotationToNorth:     {rotation_to_north} × 90°")
+				print(f"    Final Computed:      {net_rotation} × 90°\n")
+		else:
+			# Fallback for freestanding POIs
+			tile_rot = poi.get("tile_rotation", 0)
+			rotation = poi.get("rotation", 0)
+			rotation_to_north = get_rotation_to_north(name, config.prefab_dir)
+			net_rotation = (tile_rot + rotation - rotation_to_north) % 4
 
-		# Adjust for tile rotation
-		adjusted_rotation = rotation
-		if containing_tile:
-			tile_rot = containing_tile["rotation"]
-			adjusted_rotation = (rotation + tile_rot) % 4
-
-		# Apply prefab-facing logic
-		authored_facing = get_rotation_to_north(name, config.prefab_dir)
-		net_rotation = (adjusted_rotation - authored_facing) % 4
 		if net_rotation == 1:
 			sticker = sticker.rotate(90, expand=True)
 		elif net_rotation == 2:
@@ -211,7 +224,8 @@ def place_stickers():
 		w, h = sticker.size
 		draw_x, draw_z = transform_coords(x, z, config.map_center)
 		draw_z -= h
-		debug_log.write(f"{name},{display_name},{rotation},{w},{h},{x},{z},{draw_x},{draw_z}\n")
+		if debug_log:
+			debug_log.write(f"{name},{display_name},{rotation},{w},{h},{x},{z},{draw_x},{draw_z}\n")
 		if config.verbose:	
 			print(f"📍 Placed POI: {name} at ({x}, {z}) rot={rotation} → net_rot={net_rotation}")
 			if "parent_tile" in poi:
@@ -229,12 +243,22 @@ def place_stickers():
 	base_img.save(output_overlay)
 	rwg_img.save(output_rwg)
 	sticker_only_img.save(output_stickers)
-	debug_log.close()
+	if debug_log:
+		debug_log.close()
 	
 	print(f"✅ Placed {count} POI stickers.")
 	print(f"🗂️ RWG tiles saved to: {output_rwg}")
 	print(f"🖼️ Sticker-only layer saved to: {output_stickers}")
 	print(f"🖼️ Terrain + POIs saved to: {output_overlay}")
-
+	duration = time.perf_counter() - start_time
+	print(f"\n⏱️ Total render time: {duration:.2f} seconds")
+	print(f"⏱️ Total render time: {duration:.2f} seconds", file=verbose_log)
+	verbose_log.close()
+	
 if __name__ == "__main__":
-	place_stickers()
+	args = get_args()
+	config = Config(args)
+
+	config.log_resolved_paths_once(log=print)
+
+	place_stickers(config)

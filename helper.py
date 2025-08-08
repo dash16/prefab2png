@@ -33,6 +33,7 @@ def get_version():
 
 # === CONFIGURATION ===
 class Config:
+	_paths_logged = False  # idempotent guard
 	def __init__(self, args):
 		self.args = args
 		self.image_size = (6145, 6145)
@@ -79,18 +80,22 @@ class Config:
 	
 		# ✅ Save blocks.xml
 		self.default_blocks_path = default_blocks
-	
-		# Optional print
-		if not self.args.xml:
-			print("⚠️  No --xml argument provided. Defaulting to Navezgane prefab paths.")
-		else:
-			print("📂 Resolved paths:")
-			print(f"   • XML:           {xml}")
-			print(f"   • Localization:  {localization}")
-			print(f"   • Biomes:        {biomes}")
-			print(f"   • Prefab Dir:    {prefab_dir}")
-	
 		return xml, localization, biomes, prefab_dir
+		
+	### 🧩 Log Resolved Paths Once: avoids duplicate "Resolved paths" spam
+	def log_resolved_paths_once(self, log=print):
+		if Config._paths_logged:
+			return
+		Config._paths_logged = True
+
+		if not self.args.xml:
+			log("⚠️  No --xml argument provided. Defaulting to Navezgane prefab paths.")
+		else:
+			log("📂 Resolved paths:")
+			log(f"   • XML:           {self.xml_path}")
+			log(f"   • Localization:  {self.localization_path}")
+			log(f"   • Biomes:        {self.biome_path}")
+			log(f"   • Prefab Dir:    {self.prefab_dir}")
 
 	def resolve_font_path(self):
 		return "C:\\Windows\\Fonts\\arial.ttf" if platform.system() == "Windows" else "/System/Library/Fonts/Supplemental/Arial.ttf"
@@ -468,7 +473,7 @@ def get_rotation_to_north(name, prefab_dir):
 		for prop in root.findall("property"):
 			if prop.attrib.get("name") == "RotationToFaceNorth":
 				val = int(prop.attrib.get("value", 0))
-				print(f"🧭 {name} → RotationToFaceNorth: {val} (from {xml_path})")
+				#print(f"🧭 {name} → RotationToFaceNorth: {val} (from {xml_path})")
 				return val
 		print(f"⚠️ {name}: No RotationToFaceNorth tag found (default 0) — {xml_path}")
 		return 0
@@ -488,8 +493,8 @@ def rotate_poi_within_tile(local_x, local_z, tile_rotation_degrees):
 	else:
 		return local_x, local_z
 
-### 🧩 Embedded POI Extractor: Parses POIMarkers from RWG tile XML and rotates into world space
-def parse_embedded_pois(tile_name, tile_x, tile_z, tile_rotation, prefab_dir):
+### 🧩 Embedded POI Slot Extractor: Only returns position + rotation for marker slots
+def parse_embedded_poi_slots(tile_name, tile_x, tile_z, tile_rotation, prefab_dir):
 	import os
 	import xml.etree.ElementTree as ET
 
@@ -497,41 +502,38 @@ def parse_embedded_pois(tile_name, tile_x, tile_z, tile_rotation, prefab_dir):
 	if not os.path.exists(xml_path):
 		return []
 
-	tree = ET.parse(xml_path)
-	root = tree.getroot()
+	try:
+		tree = ET.parse(xml_path)
+		root = tree.getroot()
 
-	def get_prop(name):
-		elem = root.find(f".//property[@name='{name}']")
-		return elem.get("value").strip() if elem is not None else None
+		positions = root.find(".//property[@name='POIMarkerPartPositions']")
+		rotations = root.find(".//property[@name='POIMarkerPartRotations']")
 
-	names = get_prop("POIMarker")
-	positions = get_prop("POIMarkerPartPositions")
-	rotations = get_prop("POIMarkerPartRotations")
+		if not (positions is not None and rotations is not None):
+			return []
 
-	if not (names and positions and rotations):
+		pos_list = [tuple(map(int, s.strip().split(","))) for s in positions.get("value").split("#")]
+		rot_list = [int(r.strip()) for r in rotations.get("value").split("#")]
+
+		if len(pos_list) != len(rot_list):
+			return []
+
+		slots = []
+		for (lx, _, lz), local_rot in zip(pos_list, rot_list):
+			wx, wz = rotate_poi_within_tile(lx, lz, tile_rotation * 90)
+			abs_x = tile_x + wx
+			abs_z = tile_z + wz
+			abs_rot = (local_rot + tile_rotation) % 4
+
+			slots.append({
+				"x": abs_x,
+				"z": abs_z,
+				"rotation": abs_rot,
+				"parent_tile": tile_name
+			})
+
+		return slots
+
+	except Exception as e:
+		print(f"⚠️ Failed to parse POIMarkerPartPositions/Rotations from {xml_path}: {e}")
 		return []
-
-	name_list = [n.strip() for n in names.split("#")]
-	pos_list = [tuple(map(int, s.strip().split(","))) for s in positions.split("#")]
-	rot_list = [int(r.strip()) for r in rotations.split("#")]
-
-	if not (len(name_list) == len(pos_list) == len(rot_list)):
-		return []  # Malformed
-
-	embedded = []
-	for name, (lx, _, lz), local_rot in zip(name_list, pos_list, rot_list):
-		# Rotate local (lx, lz) into world space
-		wx, wz = rotate_poi_within_tile(lx, lz, tile_rotation * 90)
-		abs_x = tile_x + wx
-		abs_z = tile_z + wz
-		abs_rot = (local_rot + tile_rotation) % 4
-
-		embedded.append({
-			"name": name,
-			"x": abs_x,
-			"z": abs_z,
-			"rotation": abs_rot,
-			"parent_tile": tile_name
-		})
-
-	return embedded

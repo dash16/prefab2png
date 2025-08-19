@@ -1,7 +1,7 @@
 
 # 📦 prefab2png Project Documentation
 
-### Version: `v0.6.x+`  
+### Version: `v0.7.2`  
 **Author:** Dustin Newell  
 **Purpose:** Generate visual, labeled, and customizable map outputs from 7 Days to Die prefab, terrain, and biome data.
 
@@ -27,9 +27,11 @@
 | `labeler.py` | Places labels intelligently (green/blue zone logic) |
 | `helper.py` | CLI args, font loading, paths, utility logic |
 | `parse.py` | Loads display names, tiers, biome RGBs, prefab size/difficulty |
-| `filters.py` | Filters out prefabs based on allow/deny rules |
-| `tts_decode.py` | Renders prefab `.tts` files into PNG tiles |
-| `place_stickers.py` | Pastes `.tts` prefab tiles onto terrain map |
+| `filters.py` | Filters out prefabs based on allow/deny rules.  Sets color palette on decoded voxel arrays. |
+| `block_parser.py` | Decodes .blocks.nim and .tts files into usable structures |
+| `block_analysis.py` | Analyzes prefab voxel data to identify visible blocks and group them into semantic categories |
+| `make_stickers.py` | Parses /Data/Prefabs directory and renders "stickers" of all prefabs as viewed directly from above |
+| `place_stickers.py` | Pastes prefab tiles onto terrain map, including RWG Tiles, Parts, and POIs |
 | `generate_terrain_map.py` | Creates base terrain map with biomes, contours, and hillshade |
 
 ---
@@ -75,14 +77,14 @@
   - Skips noisy or dev/test prefabs
   - Allowlist override for `sign_260`, `sign_73`
 
-### `tts_decode.py`
-- Reads `.tts` binary prefab files and top-visible blocks
-- Matches block IDs to names via `.blocks.nim`
-- Colorizes prefab blocks semantically (grass, road, roof, etc.)
-- Saves:
-  - `*.png` (top-down prefab)
-  - `_blockmap_named.csv`
-  - `_top_visible_blockmap.csv`
+### `block_parser.py`
+- Reads `.blocks.nim` and `.tts` prefab data to create a labeled block map of prefab constructions.  `.blocks.nim` contains the mapping of block ID to block name.  `.tts` contains the physical layout of every block (including air) inside that prefab.
+	- `.blocks.nim` binaries contain an 8-byte header, 4-byte block ID, 1-byte name length, followed by a UTF-8 string containing the name.  This pattern repeats until end of file.
+	- `.tts` binaries contain a header, xyz values detailing the bounds of the prefab, and 32-bit block data (ID, flags)
+- Expected file paths: ../Data/Prefabs
+	
+### `block_analysis.py`
+- Sorts the data extracted from `block_parser.py`  A top-down view of the prefab is assembled.  Blocks are labeled and categorized for color mappings at render time.
 
 ### `place_stickers.py`
 - Loads terrain from `terrain_biome_shaded_final.png`

@@ -3,7 +3,13 @@
 
 from collections import defaultdict
 from filters import BLOCK_CATEGORY_ALIASES  # centralized alias map for category classification
-# from block_parser import get_color_for_block
+
+VERBOSE = False
+
+def set_verbose(value: bool):
+	"""Enable or disable verbose debug output for this module."""
+	global VERBOSE
+	VERBOSE = bool(value)
 
 ### 🧩 Categorize Visible Blocks: Returns category for each visible block_id
 def categorize_blocks(block_ids, block_names):
@@ -30,63 +36,23 @@ def classify_block(block_name):
 	base_name = name.split(":")[-1]
 	
 	if "wood" in base_name or "wood" in name:
-		print(f"[CLASSIFY] {block_name} → wood")
+		if VERBOSE:
+			print(f"[CLASSIFY] {block_name} → wood")
 		return "wood"
 	if "metal" in base_name or "metal" in name:
-		print(f"[CLASSIFY] {block_name} → metal")
+		if VERBOSE:
+			print(f"[CLASSIFY] {block_name} → metal")
 		return "metal"
 	if "concrete" in base_name or "concrete" in name:
-		print(f"[CLASSIFY] {block_name} → concrete")
+		if VERBOSE:
+			print(f"[CLASSIFY] {block_name} → concrete")
 		return "concrete"
 	if "brick" in base_name or "brick" in name:
-		print(f"[CLASSIFY] {block_name} → brick")
+		if VERBOSE:
+			print(f"[CLASSIFY] {block_name} → brick")
 		return "brick"
 
 	return "unknown"
-'''
-### 🧩 Surface Block Extractor: Returns topmost block name per (x, z)
-def get_top_block_surface(prefab, block_names, air_id=0):
-	layers = prefab["layers"]
-	size_z = len(layers)
-	size_y = len(layers[0])
-	size_x = len(layers[0][0])
-	surface = []
-
-	for y in range(size_y):
-		row = []
-		for x in range(size_x):
-			block = "air"
-			for z in reversed(range(size_z)):
-				block_id = layers[z][y][x]
-				if block_id != air_id:
-					block = block_names.get(block_id, f"unknown_{block_id}")
-					break
-			row.append(block)
-		surface.append(row)
-
-	return surface
-
-### 🧩 Top Block Analyzer: Extract the topmost non-air block for each x,z column
-def count_top_visible_blocks(prefab, block_names, air_id=0):
-	"""
-	Returns a dict of {block_name: count} for the topmost visible blocks in the prefab.
-	"""
-	size_x, size_y, size_z = prefab["size_x"], prefab["size_y"], prefab["size_z"]
-	layers = prefab["layers"]
-
-	counts = defaultdict(int)
-
-	for z in range(size_z):
-		for x in range(size_x):
-			for y in reversed(range(size_y)):  # top-down
-				block_id = layers[z][y][x]
-				if block_id != air_id:
-					block_name = block_names.get(block_id, f"unknown_{block_id}")
-					counts[block_name] += 1
-					break  # only the top block matters
-
-	return dict(counts)
-'''
 
 ### 🧩 Block Category Collapser: Reduces block_name → count to category → total count
 def count_block_categories(block_counts):
@@ -108,7 +74,8 @@ def categorize_surface(prefab, block_names):
 	Returns a 2D list: surface[z][x] = category
 	"""
 	if category:
-		print(f"[SURFACE] Block {block_id} '{block_name}' → {category}")
+		if VERBOSE:
+			print(f"[SURFACE] Block {block_id} '{block_name}' → {category}")
 	layers = prefab["layers"]
 	size_z = len(layers)            # vertical height
 	size_y = len(layers[0])         # rows (world Z)

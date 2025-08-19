@@ -2,7 +2,28 @@
 
 This file tracks version history for `prefab2png`.  Previous Changelog in docs/
 
-## [0.7.2] - 2025-08-08
+# 0.7.3 — Polish and Documentation Pass
+**Release Date:** 2025-08-19
+
+### Added
+- New documentation files:
+  - **architecture.md**  — module structure + data flow diagrams
+  - **cli.md** — command-line flags and usage guide
+  - **data-sources.md** — required inputs and where to find them
+  - **layers-and-styles.md**  — visual layers, styling, and exclusions
+  - **placement.md** — full label/POI/tile placement order of operations
+  - **render-modes.md** — render modes, flags, and outputs
+  
+### Changed
+- Sticker render is now less noisy — console prints are gated behind `--verbose`.
+
+### Fixed
+- Resolved duplicate messages printing to console/logs.
+
+### Removed
+ - **sticker_render.py** - deprecated, all rendering performed in `make_stickers.py`.
+
+## 0.7.2 - 2025-08-08
 ### Added
 - Pixel perfect placement for all POI tiles, whether placed directly on map or embedded in an RWG tile.
 - ⏱️ Render timer for `place_stickers` (prints total time; also written to verbose log if enabled).

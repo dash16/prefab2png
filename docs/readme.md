@@ -8,7 +8,7 @@
 
 This Python script renders layered map images from game files used by the game **7 Days to Die**. It creates layers of labeled points of interest (POIs) using in-game data, suitable for editing or display.
 
-**Version:** v0.6.2
+**Version:** v0.7.3
 **Author:** Dustin Newell  
 **License:** AGPL-3.0
 
@@ -16,7 +16,7 @@ This Python script renders layered map images from game files used by the game *
 
 ## Overview
 
-This script converts the `prefabs.xml` file from a 7 Days to Die world into layered `.png` maps. Each layer shows a category of prefabs—organized by biome, street, or player start location.  This script focuses on Navezgane, but could be easily adapted for any world map.
+This script converts the `prefabs.xml` file from a 7 Days to Die world into layered `.png` maps. Each layer shows a category of prefabs—organized by biome, street, or player start location.
 
 Prefab POIs with in-game names are included. Decorations, filler assets, and unnamed POIs are excluded. `player_start` and named street sign locations are also included.
 
@@ -31,6 +31,15 @@ Each POI dot is color-coded:
 - Tier 5: Purple
 
 Untiered POIs default to red.
+
+## New in v0.7.2
+- 100% accurate placement of all RWG tiles, parts and POIS.  Rendered exactly where the game engine places them, rotated and rendered with accurate colors.
+
+## New in v0.7.1
+- RWG tiles are rotated correctly and align with splatmap.  POIs placed outside of RWG tiles also align.
+
+## New in v0.7
+- Foundation for rendering RWG worlds is set.  RWG tiles, parts, and POI prefabs all render at voxel > pixel level accuracy when viewed from above.  Future releases will focus on color accuracy and placement in the world.
 
 ## New in v0.6.2
 -📍 Accurate POI Centering! POI dot placement is based on the prefab’s actual size (via the `Extents` value in `.xml`). This ensures center-aligned dot rendering even on large prefabs like Trader compounds or cities.
@@ -74,7 +83,6 @@ python3 prefab2png.py \
   --log-missing \
   --verbose \
   --skip-layers \
-  --no-mask \ 
   --only-biomes \
 
 ```
@@ -102,7 +110,7 @@ Default output directory: `output/`
 The script now generates unique output folders automatically based on the CLI flags you use.
 
 Examples:
-- `main.py --no-mask` → `output--no-mask__2025-07-09_1030`
+- `main.py --verbose` → `output--verbose__2025-07-09_1030`
 - `main.py --numbered-dots --combined` → `output--numbered-dots--combined__2025-07-09_1115`
 
 This makes it easier to track test renders and compare variants.

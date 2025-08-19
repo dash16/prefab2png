@@ -6,6 +6,18 @@ import os
 import re
 import random
 from filters import BLOCK_CATEGORY_ALIASES, CATEGORY_COLORS
+import block_analysis
+from helper import get_args, Config
+
+# silence noisy console prints
+VERBOSE = False
+def set_verbose(value: bool):
+	"""Enable or disable verbose debug output for this module."""
+	global VERBOSE
+	VERBOSE = bool(value)
+args = get_args()
+config = Config(args)
+block_analysis.set_verbose(args.verbose)
 
 ### 🧩 Block Name Parser: Decodes .blocks.nim using correct ID and UTF-8 format
 def load_block_names(path):
@@ -33,12 +45,13 @@ def load_block_names(path):
 			block_names[block_id] = name
 
 		except Exception as e:
-			print(f"❌ Failed at offset {offset}, block ID {block_id}: {e}")
+			print(f"❌ Failed at offset {offset}, block ID {block_id}: {e}") # warning, keep printing to console if found
 			break
-
-	print(f"✅ Parsed {len(block_names)} block names from .blocks.nim")
+	if VERBOSE:
+		print(f"✅ Parsed {len(block_names)} block names from .blocks.nim")
 	for block_id, name in block_names.items():
-#		print(f"🔍 ID {block_id} → {name}")
+		if VERBOSE:
+			print(f"🔍 ID {block_id} → {name}")
 		return block_names
 
 
@@ -80,8 +93,8 @@ def load_block_colors(blocks_xml_path):
 
 		if name and rgb:
 			block_colors[name] = rgb
-
-	print(f"🎨 Loaded {len(block_colors)} block colors (Map.Color + TintColor)")
+	if VERBOSE:
+		print(f"🎨 Loaded {len(block_colors)} block colors (Map.Color + TintColor)")
 	return block_colors
 
 ### 🧩 Block Color Fallback: Applies palette color from filters.py categories if XML/TintColor is missing
@@ -122,8 +135,8 @@ def load_tts(filepath, local_palette=None):
 		size_x = unpack(bin_file, "H")
 		size_y = unpack(bin_file, "H")
 		size_z = unpack(bin_file, "H")
-
-		print(f"📏 Prefab dimensions: {size_x} x {size_y} x {size_z} (version {version})")
+		if VERBOSE:
+			print(f"📏 Prefab dimensions: {size_x} x {size_y} x {size_z} (version {version})")
 
 		prefab = {
 			"version": version,

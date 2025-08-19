@@ -14,11 +14,7 @@
 # - Optional: auto-generation of red/blue zones based on POI clustering (v0.6+)
 
 from PIL import ImageFont
-import os
-import datetime
-import platform
-import csv
-import re
+import os, sys, datetime, platform, csv, re
 import xml.etree.ElementTree as ET
 from filters import BLOCK_CATEGORY_ALIASES
 
@@ -36,6 +32,7 @@ class Config:
 	_paths_logged = False  # idempotent guard
 	def __init__(self, args):
 		self.args = args
+		self.prefab_dir = resolve_prefab_dir(args)
 		self.image_size = (6145, 6145)
 		self.map_center = 3072
 		self.dot_radius = 4
@@ -112,22 +109,24 @@ parser = argparse.ArgumentParser(description="Render 7DTD prefab map layers.")
 parser.add_argument(
 	"--xml",
 	type=str,
-	help="Full path to 'prefabs.xml'"
+	help="Path to 'prefabs.xml'"
 )
 parser.add_argument(
 	"--localization",
 	type=str,
-	help="Full path to 'Localization.txt'"
+	help="Path to 'Localization.txt'"
 )
 parser.add_argument(
 	"--biomes",
 	type=str,
-	help="Full path to 'biomes.png'"
+	help="Path to 'biomes.png'"
 )
 parser.add_argument(
-	"--prefab-dir",
+	'--prefab-dir',
+	dest='prefab_dir',
 	type=str,
-	help="Full path to the prefab directory containing individual .xml files with prefab metadata (size, difficulty, etc)."
+	default=None,
+	help='Path to the game Prefabs directory (contains .tts, .blocks.nim, .xml, etc.). If omitted, prefab2png will auto-detect the default install path for your platform.'
 )
 parser.add_argument(
 	"--verbose",
@@ -188,29 +187,52 @@ parser.add_argument(
 	help="Font size for POI labels. Default is 25. Max is 60."
 )
 parser.add_argument(
-	"--blocks",
-	help="Path to .blocks.nim file or folder (used for voxelmap rendering)"
-)
-parser.add_argument(
-	"--prefab-xml",
-	help="Matching .xml file for a single prefab (used in voxelmap mode)"
+	'--blocks',
+	dest='blocks_deprecated',
+	type=str,
+	default=None,
+	help='[DEPRECATED] Use --prefab-dir instead. Accepts the same path (the Prefabs directory).'
 )
 parser.add_argument(
 	"--output",
 	help="Output path or folder for rendered voxel PNGs"
 )
 
-parser.add_argument(
-	"--only",
-	type=str,
-	help="Render only this prefab by name (without extension)"
-)
-parser.add_argument(
-	"--mode",
-	type=str,
-	default="default",
-	help="Choose rendering mode (default/test1/xyz/yxz/etc)"
-)
+### 🧩 Deprecated Flag Shim: Map --blocks → --prefab-dir with precedence & warning
+
+def _autodetect_prefab_dir() -> str:
+	# Keep your existing detection logic here (macOS/Windows defaults)
+	# Example macOS default:
+	home = os.path.expanduser('~')
+	macos = os.path.join(home, 'Library', 'Application Support', 'Steam', 'steamapps', 'common', '7 Days To Die', 'Data', 'Prefabs')
+	# TODO: extend for Windows (Steam\steamapps\common\7 Days To Die\Data\Prefabs) if not already present
+	return macos
+
+def resolve_prefab_dir(args) -> str:
+	"""
+	Resolves the effective Prefabs directory, honoring the new --prefab-dir,
+	the deprecated --blocks alias, and platform defaults.
+	Precedence:
+	1) --prefab-dir (wins if both are provided)
+	2) --blocks (DEPRECATED; maps to prefab-dir with warning)
+	3) auto-detect default path
+	"""
+	if getattr(args, 'prefab_dir', None) and getattr(args, 'blocks_deprecated', None):
+		# User provided both; prefer the new flag, warn that --blocks is ignored
+		print('⚠️  --blocks is deprecated and was ignored because --prefab-dir was also provided.', file=sys.stderr)
+		return args.prefab_dir
+
+	if getattr(args, 'prefab_dir', None):
+		return args.prefab_dir
+
+	if getattr(args, 'blocks_deprecated', None):
+		print('⚠️  --blocks is deprecated; please switch to --prefab-dir. Using the supplied path for now.', file=sys.stderr)
+		return args.blocks_deprecated
+
+	# neither provided → auto-detect
+	auto_dir = _autodetect_prefab_dir()
+	return auto_dir
+
 
 def get_args():
 	args = parser.parse_args()

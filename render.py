@@ -14,16 +14,6 @@ from labeler import (
 )
 from helper import try_green_zone_label
 from block_analysis import categorize_surface, categorize_blocks
-'''
-# === Bounding box helper (optional future use) ===
-def boxes_overlap(box1, box2, padding=2):
-	return not (
-		box1[2] + padding < box2[0] or
-		box1[0] - padding > box2[2] or
-		box1[3] + padding < box2[1] or
-		box1[1] - padding > box2[3]
-	)
-'''
 
 ### 🧩 Top Block Renderer: Renders top-down image of a prefab using block colors
 def render_top_blocks(tts_path, blocks_path, blocks_xml_path, config):
